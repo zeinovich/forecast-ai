@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "dfu-automl"
+version = "0.1.0"
+description = "Automated system for demand forecasting"
+authors = ["Nikita.Zinovich <nikita.zinovich@gmail.com>"]
+license = "MIT License"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+numpy = "1.26.4"
+pandas = "^2.2.2"
+matplotlib = "^3.9.2"
+plotly = "^5.24.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
