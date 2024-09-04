@@ -14,7 +14,7 @@
 ``shop_sales_dates.csv``
 
     date
-    wm_yr_wk: Encoded date (i.e. '11136' -> 1-11-36 - IDK, year 2011, 36th week)
+    wm_yr_wk: Encoded week (i.e. '11136' -> 1-11-36 - IDK, year 2011, 36th week)
     weekday
     wday: INT for week day (starts with Sat = 1)
     month
@@ -32,8 +32,8 @@
 
     store_id: one of 'STORE_1', 'STORE_2', 'STORE_3' 
     item_id: item ID (in format "<STORE_ID>_<ID>)
-    wm_yr_wk: Encoded date
-    sell_price: FLOAT for price
+    wm_yr_wk: Encoded week
+    sell_price: FLOAT for price, price is set for a week
 
 ``shop_sales.csv``
 
