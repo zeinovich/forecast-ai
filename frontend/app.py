@@ -278,6 +278,9 @@ def main():
             sku = st.sidebar.selectbox("Select SKU", sku_list)
             store = st.sidebar.selectbox("Select Store", store_list)
 
+            st.session_state["sku"] = sku
+            st.session_state["store"] = store
+
             # Forecast horizon and granularity on the main page
             st.header("Forecast Settings")
             forecast_horizon = st.selectbox(
@@ -351,6 +354,9 @@ def main():
 
         # Display the selected forecast settings
         st.subheader("Forecast Settings")
+
+        sku = st.session_state["sku"]
+        store = st.session_state["store"]
 
         # Select forecast horizon and granularity
         horizon = st.selectbox("Forecast Horizon", ["1-day", "1-week", "1-month"])
