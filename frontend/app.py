@@ -396,6 +396,61 @@ def main():
                 st.error(
                     "Failed to get forecast. Please check your settings and try again."
                 )
+                st.stop()
+
+            fig = go.Figure()
+
+            fig.add_trace(
+                go.Scatter(
+                    x=forecast_data["date"],
+                    y=forecast_data["predicted"],
+                    mode="lines",
+                    name="Predicted Demand",
+                    line=dict(color="blue"),
+                )
+            )
+
+            # Prediction intervals (Uncertainty bounds) shaded area
+            fig.add_trace(
+                go.Scatter(
+                    x=forecast_data["date"],
+                    y=forecast_data["upper"],
+                    mode="lines",
+                    line=dict(width=0),
+                    name="Upper Bound",
+                    showlegend=False,
+                )
+            )
+
+            fig.add_trace(
+                go.Scatter(
+                    x=forecast_data["date"],
+                    y=forecast_data["lower"],
+                    mode="lines",
+                    line=dict(width=0),
+                    fill="tonexty",
+                    fillcolor="rgba(68, 68, 68, 0.3)",
+                    name="Uncertainty Bounds",
+                    showlegend=True,
+                )
+            )
+
+            fig.update_layout(
+                title="Predicted Demand with Uncertainty Bounds",
+                xaxis_title="Date",
+                yaxis_title="Demand",
+                legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+            )
+
+            fig.add_trace(
+                go.Scatter(
+                    x=filtered_sales["date"],
+                    y=filtered_sales["cnt"],
+                    labels={"date": "Date", "cnt": "Items Sold"},
+                )
+            )
+
+            st.plotly_chart(fig)
 
     # Placeholder for future pages
     elif page == "Other Pages (Coming Soon)":
