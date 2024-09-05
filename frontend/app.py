@@ -17,6 +17,14 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly import subplots
 
+_pallette = [
+    "#5ba300",
+    "#89ce00",
+    "#0073e6",
+    "#e6308a",
+    "#b51963",
+]
+
 
 # Function to validate that the horizon is greater than the granularity
 def validate_horizon_vs_granularity(horizon, granularity):
@@ -116,15 +124,18 @@ def add_events(event_dates: pd.DataFrame, plot: go.Figure) -> go.Figure:
     # to not throw around dataframes
     top = max(trace["y"].max() for trace in plot.data if "y" in trace)
 
+    cmap = {t: c for t, c in zip(event_dates["event_type_1"].unique(), _pallette)}
+
     for _, row in event_dates.iterrows():
         event_date = row["date"]
         event_label = row["event_name_1"]
+        event_type = row["event_type_1"]
 
         # Add vertical rectangle for the event
         plot.add_vrect(
             x0=event_date - timedelta(days=0.5),
             x1=event_date + timedelta(days=0.5),
-            fillcolor="LightSalmon",
+            fillcolor=cmap[event_type],
             opacity=0.5,
             layer="below",
             line_width=0,
@@ -140,9 +151,9 @@ def add_events(event_dates: pd.DataFrame, plot: go.Figure) -> go.Figure:
             textangle=-90,  # Rotate text to vertical
             valign="middle",  # Vertically center the text in the rectangle
             xshift=0,  # Shift text slightly for better alignment
-            bgcolor="LightSalmon",
-            bordercolor="Black",
-            borderwidth=1,
+            bgcolor=cmap[event_type],
+            font=dict(color="black"),
+            opacity=0.8,
         )
 
     return plot
@@ -281,68 +292,52 @@ def main():
             st.session_state["sku"] = sku
             st.session_state["store"] = store
 
-            # Forecast horizon and granularity on the main page
-            st.header("Forecast Settings")
-            forecast_horizon = st.selectbox(
-                "Select Forecast Horizon", ["1-day", "1-week", "1-month"]
+            # Filter the data based on selected SKU and Store
+            filtered_sales = sales_df[
+                (sales_df["SKU"] == sku) & (sales_df["store_id"] == store)
+            ]
+
+            if len(filtered_sales) == 0:
+                st.warning(f"SKU {sku} has never been sold in store {store}")
+                st.stop()
+
+            # Plotting the sales data
+            st.subheader(f"Sales for SKU {sku} at Store {store}")
+
+            st.markdown("### Select Time Window for Plots")
+
+            time_window = st.radio(
+                "Choose time window",
+                ["1-week", "1-month", "3-month", "1-year", "All"],
             )
-            granularity = st.selectbox(
-                "Select Granularity", ["1-day", "1-week", "1-month"]
+
+            # Filter data by the selected time window
+            filtered_sales = filter_by_time_window(filtered_sales, "date", time_window)
+            filtered_dates = filter_by_time_window(dates, "date", time_window)
+
+            event_dates = filtered_dates[filtered_dates["event_type_1"].notna()][
+                ["date", "event_name_1", "event_type_1"]
+            ]
+            sales_plot = make_plot(
+                filtered_sales,
+                x="date",
+                y="cnt",
+                title="Sales over Time",
+                labels={"date": "Date", "cnt": "Items Sold"},
             )
+            sales_plot = add_events(event_dates, sales_plot)
+            st.plotly_chart(sales_plot)
 
-            # Check that the horizon is greater than granularity
-            if not validate_horizon_vs_granularity(forecast_horizon, granularity):
-                st.error("Forecast horizon must be greater than granularity.")
-
-            else:
-                # Filter the data based on selected SKU and Store
-                filtered_sales = sales_df[
-                    (sales_df["SKU"] == sku) & (sales_df["store_id"] == store)
-                ]
-
-                if len(filtered_sales) == 0:
-                    st.warning(f"SKU {sku} has never been sold in store {store}")
-                    st.stop()
-
-                # Plotting the sales data
-                st.subheader(f"Sales for SKU {sku} at Store {store}")
-
-                st.subheader("Select Time Window for Plots")
-
-                time_window = st.radio(
-                    "Choose time window",
-                    ["1-week", "1-month", "3-month", "1-year", "All"],
-                )
-
-                # Filter data by the selected time window
-                filtered_sales = filter_by_time_window(
-                    filtered_sales, "date", time_window
-                )
-                filtered_dates = filter_by_time_window(dates, "date", time_window)
-
-                event_dates = filtered_dates[filtered_dates["event_type_1"].notna()][
-                    ["date", "event_name_1"]
-                ]
-                sales_plot = make_plot(
-                    filtered_sales,
-                    x="date",
-                    y="cnt",
-                    title="Sales over Time",
-                    labels={"date": "Date", "cnt": "Items Sold"},
-                )
-                sales_plot = add_events(event_dates, sales_plot)
-                st.plotly_chart(sales_plot)
-
-                # Plotting the price data
-                price_plot = make_plot(
-                    filtered_sales,
-                    x="date",
-                    y="sell_price",
-                    title="Prices Over Time",
-                    labels={"date": "Date", "sell_price": "Sell Price"},
-                )
-                price_plot = add_events(event_dates, price_plot)
-                st.plotly_chart(price_plot)
+            # Plotting the price data
+            price_plot = make_plot(
+                filtered_sales,
+                x="date",
+                y="sell_price",
+                title="Prices Over Time",
+                labels={"date": "Date", "sell_price": "Sell Price"},
+            )
+            price_plot = add_events(event_dates, price_plot)
+            st.plotly_chart(price_plot)
 
         else:
             st.sidebar.warning(
@@ -358,11 +353,16 @@ def main():
         sku = st.session_state["sku"]
         store = st.session_state["store"]
 
-        # Select forecast horizon and granularity
-        horizon = st.selectbox("Forecast Horizon", ["1-day", "1-week", "1-month"])
-        granularity = st.selectbox(
-            "Forecast Granularity", ["1-day", "1-week", "1-month"]
+        # Forecast horizon and granularity
+        st.header(f"Forecast Settings for SKU {sku} in store {store}")
+        horizon = st.selectbox(
+            "Select Forecast Horizon", ["1-day", "1-week", "1-month"]
         )
+        granularity = st.selectbox("Select Granularity", ["1-day", "1-week", "1-month"])
+
+        # Check that the horizon is greater than granularity
+        if not validate_horizon_vs_granularity(horizon, granularity):
+            st.error("Forecast horizon must be greater than granularity.")
 
         # Model selection (this is a simple list of boosting algorithms for now)
         model = st.selectbox(
