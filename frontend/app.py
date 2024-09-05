@@ -10,6 +10,7 @@ Author: zeinovich
 
 from datetime import timedelta
 from typing import Dict
+import requests
 
 import streamlit as st
 import pandas as pd
@@ -234,7 +235,7 @@ def main():
     # Page selection in the sidebar
     st.sidebar.title("Navigation")
     page = st.sidebar.selectbox(
-        "Select Page", ["Input Page", "Other Pages (Coming Soon)"]
+        "Select Page", ["Input Page", "Forecast", "Other Pages (Coming Soon)"]
     )
 
     # Logic for the Input Page
@@ -243,15 +244,30 @@ def main():
 
         # File upload section in the sidebar
         st.sidebar.header("Upload CSV Files")
+
         dates_file = st.sidebar.file_uploader("Upload dates CSV", type="csv")
         sales_file = st.sidebar.file_uploader("Upload Sales CSV", type="csv")
         prices_file = st.sidebar.file_uploader("Upload Prices CSV", type="csv")
 
+        if "dates_file" not in st.session_state:
+            st.session_state["dates_file"] = dates_file
+            st.session_state["sales_file"] = sales_file
+            st.session_state["prices_file"] = prices_file
+
         # Load the uploaded data
-        if dates_file and sales_file and prices_file:
-            dates = pd.read_csv(dates_file)
-            sales = pd.read_csv(sales_file)
-            prices = pd.read_csv(prices_file)
+        if (
+            st.session_state["dates_file"]
+            and st.session_state["sales_file"]
+            and st.session_state["prices_file"]
+        ):
+            st.session_state["dates_file"].seek(0)
+            st.session_state["sales_file"].seek(0)
+            st.session_state["prices_file"].seek(0)
+
+            dates = pd.read_csv(st.session_state["dates_file"])
+            sales = pd.read_csv(st.session_state["sales_file"])
+            prices = pd.read_csv(st.session_state["prices_file"])
+
             sales_df = merge(dates, sales, prices)
 
             # Assuming SKU and Store columns exist in sales and prices
@@ -259,8 +275,8 @@ def main():
             store_list = sorted(sales_df["store_id"].unique())
 
             # SKU and Store selection
-            selected_sku = st.sidebar.selectbox("Select SKU", sku_list)
-            selected_store = st.sidebar.selectbox("Select Store", store_list)
+            sku = st.sidebar.selectbox("Select SKU", sku_list)
+            store = st.sidebar.selectbox("Select Store", store_list)
 
             # Forecast horizon and granularity on the main page
             st.header("Forecast Settings")
@@ -278,17 +294,15 @@ def main():
             else:
                 # Filter the data based on selected SKU and Store
                 filtered_sales = sales_df[
-                    (sales_df["SKU"] == selected_sku)
-                    & (sales_df["store_id"] == selected_store)
+                    (sales_df["SKU"] == sku) & (sales_df["store_id"] == store)
                 ]
 
                 if len(filtered_sales) == 0:
-                    st.warning(
-                        f"SKU {selected_sku} has never been sold in store {selected_store}"
-                    )
+                    st.warning(f"SKU {sku} has never been sold in store {store}")
+                    st.stop()
 
                 # Plotting the sales data
-                st.subheader(f"Sales for SKU {selected_sku} at Store {selected_store}")
+                st.subheader(f"Sales for SKU {sku} at Store {store}")
 
                 st.subheader("Select Time Window for Plots")
 
@@ -331,6 +345,51 @@ def main():
             st.sidebar.warning(
                 "Please upload all three CSV files (dates, Sales, Prices)."
             )
+
+    elif page == "Forecast":
+        st.title("Forecast Page")
+
+        # Display the selected forecast settings
+        st.subheader("Forecast Settings")
+
+        # Select forecast horizon and granularity
+        horizon = st.selectbox("Forecast Horizon", ["1-day", "1-week", "1-month"])
+        granularity = st.selectbox(
+            "Forecast Granularity", ["1-day", "1-week", "1-month"]
+        )
+
+        # Model selection (this is a simple list of boosting algorithms for now)
+        model = st.selectbox(
+            "Select Model", ["XGBoost", "LightGBM", "CatBoost", "Gradient Boosting"]
+        )
+
+        # Button to trigger the forecast request
+        if st.button("Get Forecast"):
+            # Create payload with forecast settings
+            payload = {
+                "sku": sku,
+                "store": store,
+                "horizon": horizon,
+                "granularity": granularity,
+                "model": model,
+            }
+
+            # Send request to the backend (example backend port assumed to be 8000)
+            backend_url = "http://localhost:8000/forecast"  # Update this with the correct backend URL
+            response = requests.post(backend_url, json=payload, timeout=60)
+
+            # Process the response
+            if response.status_code == 200:
+                forecast_data = pd.DataFrame(response.json())
+                st.success("Forecast generated successfully!")
+
+                # Display the forecast data
+                st.write(forecast_data)
+
+            else:
+                st.error(
+                    "Failed to get forecast. Please check your settings and try again."
+                )
 
     # Placeholder for future pages
     elif page == "Other Pages (Coming Soon)":
