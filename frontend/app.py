@@ -1,4 +1,15 @@
+"""
+Streamlit app
+
+App has 3 pages: Input, [TODO] Prediction, [TODO] AutoML
+
+To start app run: `streamlit run ./frontend/app.py`
+
+Author: zeinovich
+"""
+
 from datetime import timedelta
+from typing import Dict
 
 import streamlit as st
 import pandas as pd
@@ -100,6 +111,8 @@ def add_events(event_dates: pd.DataFrame, plot: go.Figure) -> go.Figure:
     Returns:
         go.Figure: Plotly go.Figure with highlighted events
     """
+    # Gets max Y value directly from Figure
+    # to not throw around dataframes
     top = max(trace["y"].max() for trace in plot.data if "y" in trace)
 
     for _, row in event_dates.iterrows():
@@ -134,7 +147,25 @@ def add_events(event_dates: pd.DataFrame, plot: go.Figure) -> go.Figure:
     return plot
 
 
-def make_plot(df, x, y, title, labels):
+def make_plot(
+    df: pd.DataFrame, x: str, y: str, title: str, labels: Dict[str, str]
+) -> go.Figure:
+    """
+    Plots line plot from data. Data distribution is appended to the left of a line plot
+
+    Args:
+        df (pd.DataFrame): Data
+        x (str): X-axis column
+        y (str): Y-axis column (also used for histogram)
+        title (str): Figure title
+        labels (Dict[str, str]): Column names, i.e. {"sell_price": "Sell Price"}
+
+    Returns:
+        go.Figure: Plotly plot
+    """
+    # Create 2 subplots with shared Y-axis
+    # Left subplot - Line plot (80% width)
+    # Right subplot - histogram of values in y column (20% width)
     plot = subplots.make_subplots(
         rows=1, cols=2, shared_yaxes=True, column_widths=[0.8, 0.2]
     )
@@ -165,31 +196,34 @@ def make_plot(df, x, y, title, labels):
         col=2,
     )
 
-    min_, max_ = df[y].min(), df[y].max()
-    # Add dashed horizontal lines for min and max sales with annotations
+    min_y, max_y = df[y].min(), df[y].max()
+    min_x, max_x = df[x].min(), df[x].max()
+
+    # Add dashed horizontal lines for min and max Y with annotations
     plot.add_shape(
         type="line",
-        x0=df[x].min(),
-        x1=df[x].max(),
-        y0=min_,
-        y1=min_,
+        x0=min_x,
+        x1=max_x,
+        y0=min_y,
+        y1=min_y,
         line=dict(color="Green", width=2, dash="dash"),
-        name=f"Min: {min_}",
+        name=f"Min: {min_y}",
         showlegend=True,
     )
 
     plot.add_shape(
         type="line",
-        x0=df[x].min(),
-        x1=df[x].max(),
-        y0=max_,
-        y1=max_,
+        x0=min_x,
+        x1=max_x,
+        y0=max_y,
+        y1=max_y,
         line=dict(color="Red", width=2, dash="dash"),
-        name=f"Max: {max_}",
+        name=f"Max: {max_y}",
         showlegend=True,
     )
 
     plot.update_layout(title=title, xaxis_title=labels[x], yaxis_title=labels[y])
+    # Set right sublot x-axis label directly
     plot["layout"]["xaxis2"]["title"] = "Fraction, %"
     plot.update_layout(showlegend=True)
 
@@ -269,7 +303,6 @@ def main():
                 )
                 filtered_dates = filter_by_time_window(dates, "date", time_window)
 
-                # [TODO] - zeinovich - add filters for date (periods) based on horizon
                 event_dates = filtered_dates[filtered_dates["event_type_1"].notna()][
                     ["date", "event_name_1"]
                 ]
