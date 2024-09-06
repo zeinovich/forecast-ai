@@ -141,6 +141,8 @@ def get_forecast_settings(sku_list, store_list):
         st.sidebar.error("Forecast horizon must be greater than granularity.")
         st.stop()
 
+    # Model selection (this is a simple list of boosting algorithms for now)
+    # [TODO] - zeinovich - postprocessing of response
     # models_list = requests.post(MODELS_URL, timeout=TIMEOUT)
     models_list = ["XGBoost"]
     model = st.sidebar.selectbox("Select Model", models_list)
@@ -303,19 +305,17 @@ def main():
     # if response and response.status_code == 200:
     if st.session_state["response"] is not None:
         # [TODO] - zeinovich - postprocessing of response
+        # append last history point to prediction
         # forecast_data = pd.DataFrame(response.json())
         forecast_data = response
-        st.success("Forecast generated successfully!")
+        # st.success("Forecast generated successfully!")
 
         # Display the forecast data
-        st.write(forecast_data)
+        # st.write(forecast_data)
 
     else:
         st.error("Failed to get forecast. Please check your settings and try again.")
         st.stop()
-
-    # Model selection (this is a simple list of boosting algorithms for now)
-    # [TODO] - zeinovich - postprocessing of response
 
     # # [TODO] - zeinovich - check if historical is present
     # # and preprocess it
