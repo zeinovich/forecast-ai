@@ -118,6 +118,11 @@ def prepare_datasets(dates_file, sales_file, prices_file):
     return sales_df, dates
 
 
+def reset_forecast():
+    if "response" in st.session_state:
+        del st.session_state["response"]
+
+
 def get_forecast_settings(sku_list, store_list):
     # Assuming SKU and Store columns exist in sales and prices
 
@@ -127,16 +132,20 @@ def get_forecast_settings(sku_list, store_list):
 
     st.sidebar.subheader("Forecast Settings")
     horizon = st.sidebar.selectbox(
-        "Select Forecast Horizon", ["1-day", "1-week", "1-month"]
+        "Select Forecast Horizon",
+        ["1-day", "1-week", "1-month"],
+        on_change=reset_forecast,
     )
     # [TODO] - zeinovich - add aggregation of target
     granularity = st.sidebar.selectbox(
         "Select Granularity",
         # ["1-day", "1-week", "1-month"],
         ["1-day"],
+        on_change=reset_forecast,
     )
     # Check that the horizon is greater than granularity
     valid, h_int, g_int = validate_horizon_vs_granularity(horizon, granularity)
+
     if not valid:
         st.sidebar.error("Forecast horizon must be greater than granularity.")
         st.stop()
@@ -214,50 +223,46 @@ def main():
 
     if len(filtered_sales) == 0:
         st.warning(f"SKU {sku} has never been sold in store {store}")
-        st.stop()
+        # [TODO] - zeinovich - how render plots with no history
+        sales_st = st.empty()
 
     # Plotting the sales data
     st.subheader(f"Sales for SKU {sku} at Store {store}")
 
-    # time_window = st.radio(
-    #     "Choose time window",
-    #     ["1-week", "1-month", "3-month", "1-year", "All"],
-    #     horizontal=True,
-    # )
+    # Filter data by the selected time window
+    if len(filtered_sales) > 0:
+        cutoff = st.selectbox(
+            "Display history",
+            ["1-week", "1-month", "3-month", "1-year", "All"],
+            index=2,
+        )
+        filtered_sales = filter_by_time_window(filtered_sales, "date", cutoff)
+        filtered_dates = filter_by_time_window(dates, "date", cutoff)
 
-    # # Filter data by the selected time window
-    cutoff = st.sidebar.selectbox(
-        "Choose time window",
-        ["1-week", "1-month", "3-month", "1-year", "All"],
-        index=2,
-    )
-    filtered_sales = filter_by_time_window(filtered_sales, "date", cutoff)
-    filtered_dates = filter_by_time_window(dates, "date", cutoff)
+        event_dates = filtered_dates[filtered_dates["event_type_1"].notna()][
+            ["date", "event_name_1", "event_type_1"]
+        ]
+        sales_plot = sku_plot(
+            filtered_sales,
+            x="date",
+            y="cnt",
+            title="Sales over Time",
+            labels={"date": "Date", "cnt": "Items Sold"},
+        )
+        sales_plot = add_events(event_dates, sales_plot)
+        sales_st = st.empty()
+        sales_st.plotly_chart(sales_plot)
 
-    event_dates = filtered_dates[filtered_dates["event_type_1"].notna()][
-        ["date", "event_name_1", "event_type_1"]
-    ]
-    sales_plot = sku_plot(
-        filtered_sales,
-        x="date",
-        y="cnt",
-        title="Sales over Time",
-        labels={"date": "Date", "cnt": "Items Sold"},
-    )
-    sales_plot = add_events(event_dates, sales_plot)
-    sales_st = st.empty()
-    sales_st.plotly_chart(sales_plot)
-
-    # Plotting the price data
-    price_plot = sku_plot(
-        filtered_sales,
-        x="date",
-        y="sell_price",
-        title="Prices Over Time",
-        labels={"date": "Date", "sell_price": "Sell Price"},
-    )
-    price_plot = add_events(event_dates, price_plot)
-    st.plotly_chart(price_plot)
+        # Plotting the price data
+        price_plot = sku_plot(
+            filtered_sales,
+            x="date",
+            y="sell_price",
+            title="Prices Over Time",
+            labels={"date": "Date", "sell_price": "Sell Price"},
+        )
+        price_plot = add_events(event_dates, price_plot)
+        st.plotly_chart(price_plot)
 
     # Button to trigger the forecast request
     if st.sidebar.button("Get Forecast"):
@@ -273,7 +278,6 @@ def main():
         # Send request to the backend (example backend port assumed to be 8000)
         # Update this with the correct backend URL
         # response = requests.post(BACKEND_URL, json=payload, timeout=TIMEOUT)
-
         response = np.random.normal(
             filtered_sales["cnt"].mean(),
             filtered_sales["cnt"].std(),
@@ -298,6 +302,9 @@ def main():
         response["upper"] = np.max(response[["lower", "upper"]].to_numpy(), axis=1)
         st.session_state["response"] = response
 
+    elif "response" in st.session_state:
+        pass
+
     else:
         st.stop()
 
@@ -307,7 +314,7 @@ def main():
         # [TODO] - zeinovich - postprocessing of response
         # append last history point to prediction
         # forecast_data = pd.DataFrame(response.json())
-        forecast_data = response
+        forecast_data = st.session_state["response"]
         # st.success("Forecast generated successfully!")
 
         # Display the forecast data
