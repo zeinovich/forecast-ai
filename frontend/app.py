@@ -12,6 +12,8 @@ from datetime import timedelta
 import requests  # dev
 
 import streamlit as st
+from itables.streamlit import interactive_table
+
 import pandas as pd
 import numpy as np  # dev
 
@@ -198,6 +200,14 @@ def filter_by_time_window(
     return df[df[date_column] >= start_date]
 
 
+def process_forecast_table(df: pd.DataFrame):
+    st.subheader("Forecast Table")
+    df = df.round(2)
+    cols = df.drop("date", axis=1).columns.tolist()
+    df = df[["date"] + cols]
+    interactive_table(df)
+
+
 def main():
     """Main"""
     st.set_page_config(layout="wide")
@@ -327,7 +337,7 @@ def main():
         # st.success("Forecast generated successfully!")
 
         # Display the forecast data
-        st.write(forecast_data)
+        process_forecast_table(forecast_data)
 
     else:
         st.error("Failed to get forecast. Please check your settings and try again.")
