@@ -127,8 +127,12 @@ def get_forecast_settings(sku_list, store_list):
     # Assuming SKU and Store columns exist in sales and prices
 
     # SKU and Store selection
-    sku = st.sidebar.selectbox("Select SKU", sku_list)
-    store = st.sidebar.selectbox("Select Store", store_list)
+    sku = st.sidebar.selectbox("Select SKU", sku_list, on_change=reset_forecast)
+    store = st.sidebar.selectbox(
+        "Select Store",
+        store_list,
+        on_change=reset_forecast,
+    )
 
     st.sidebar.subheader("Forecast Settings")
     horizon = st.sidebar.selectbox(
@@ -154,7 +158,11 @@ def get_forecast_settings(sku_list, store_list):
     # [TODO] - zeinovich - postprocessing of response
     # models_list = requests.post(MODELS_URL, timeout=TIMEOUT)
     models_list = ["XGBoost"]
-    model = st.sidebar.selectbox("Select Model", models_list)
+    model = st.sidebar.selectbox(
+        "Select Model",
+        models_list,
+        on_change=reset_forecast,
+    )
 
     return sku, store, h_int, g_int, model
 
@@ -192,6 +200,7 @@ def filter_by_time_window(
 
 def main():
     """Main"""
+    st.set_page_config(layout="wide")
     st.title("Demand Forecasting")
 
     # File upload section in the sidebar
@@ -318,7 +327,7 @@ def main():
         # st.success("Forecast generated successfully!")
 
         # Display the forecast data
-        # st.write(forecast_data)
+        st.write(forecast_data)
 
     else:
         st.error("Failed to get forecast. Please check your settings and try again.")
