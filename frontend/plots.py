@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Any
 from datetime import timedelta
 
 import pandas as pd
@@ -148,7 +148,10 @@ def add_events(event_dates: pd.DataFrame, plot: go.Figure) -> go.Figure:
 
 
 def forecast_plot(
-    forecast_data: pd.DataFrame, historical: pd.DataFrame = None
+    forecast_data: pd.DataFrame,
+    fig: go.Figure = None,
+    add_trace: Dict[str, Any] = None,
+    scatter_args: Dict[str, Any] = None,
 ) -> go.Figure:
     """
     Plotting function for forecast.
@@ -164,16 +167,19 @@ def forecast_plot(
     Returns:
         go.Figure: Forecast plot
     """
-    fig = go.Figure()
+    if not fig:
+        fig = go.Figure()
 
     fig.add_trace(
         go.Scatter(
             x=forecast_data["date"],
             y=forecast_data["predicted"],
             mode="lines",
-            name="Predicted Demand",
-            line=dict(color="blue"),
-        )
+            # name="Predicted Demand",
+            showlegend=False,
+            **scatter_args,
+        ),
+        **add_trace,
     )
 
     # Prediction intervals (Uncertainty bounds) shaded area
@@ -183,9 +189,10 @@ def forecast_plot(
             y=forecast_data["upper"],
             mode="lines",
             line=dict(width=0),
-            name="Upper Bound",
+            # name="Upper Bound",
             showlegend=False,
-        )
+        ),
+        **add_trace,
     )
 
     fig.add_trace(
@@ -196,25 +203,16 @@ def forecast_plot(
             line=dict(width=0),
             fill="tonexty",
             fillcolor="rgba(68, 68, 68, 0.3)",
-            name="Uncertainty Bounds",
-            showlegend=True,
-        )
+            # name="Uncertainty Bounds",
+            showlegend=False,
+        ),
+        **add_trace,
     )
 
     fig.update_layout(
         title="Predicted Demand with Uncertainty Bounds",
         xaxis_title="Date",
         yaxis_title="Demand",
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
     )
-
-    if historical is not None:
-        fig.add_trace(
-            go.Scatter(
-                x=historical["date"],
-                y=historical["cnt"],
-                labels={"date": "Date", "cnt": "Items Sold"},
-            )
-        )
 
     return fig
