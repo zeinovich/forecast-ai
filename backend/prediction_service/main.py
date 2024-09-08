@@ -13,8 +13,9 @@ async def predict(payload: dict):
     Получает данные, предобрабатывает их и вызывает модель для предсказания и доверительных интервалов.
     Возвращает закодированный датафрейм с колонками ["date", "pred", "upper", "lower"].
     """
-    target = payload["target"]
-    date = payload["date"]
+    target_name = payload["target_name"]
+    date_name = payload["date_name"]
+    segment_name = payload["segment_name"]
     data = payload["data"]
     horizon = payload["horizon"]
     granularity = payload["granularity"]
@@ -24,16 +25,21 @@ async def predict(payload: dict):
     decoded_data = base64.b64decode(data)
     df = pd.read_csv(BytesIO(decoded_data))
 
-    df = preprocess_data(df, target, date, granularity)
+    df = preprocess_data(df, target_name, date_name, segment_name, granularity)
 
-    predictions, upper_bound, lower_bound = predict_with_model(df, horizon, model, metric)
+    prediction_dates, predictions, upper_bound, lower_bound, metric_value = predict_with_model(df, horizon, model, metric)
 
-    future_dates = pd.date_range(df[date].max(), periods=horizon + 1, freq="D")[1:]
+    df[date_name] = pd.to_datetime(df['timestamp'])
+    df[segment_name] = df['segment']
+    df[target_name] = df['target']
+    df.drop(columns=['timestamp', 'segment', 'target'], inplace=True)
+
     result_df = pd.DataFrame({
-        "date": future_dates,
-        "pred": predictions,          # Предсказанные значения
-        "upper": upper_bound,         # Верхняя граница доверительного интервала
-        "lower": lower_bound          # Нижняя граница доверительного интервала
+        "date": prediction_dates,
+        "pred": predictions,
+        "upper": upper_bound,
+        "lower": lower_bound,
+        "metric_score": metric_value
     })
 
     buffer = BytesIO()
