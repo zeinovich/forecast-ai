@@ -13,7 +13,6 @@ import requests  # dev
 from typing import List
 
 import streamlit as st
-from itables.streamlit import interactive_table
 
 import pandas as pd
 import numpy as np  # dev
@@ -263,12 +262,12 @@ def filter_by_time_window(
     return df[df[date_column] >= start_date]
 
 
-def process_forecast_table(df: pd.DataFrame):
-    st.subheader("Forecast Table")
+def process_forecast_table(df: pd.DataFrame, date_name: str):
     df = df.round(2)
-    cols = df.drop("date", axis=1).columns.tolist()
-    df = df[["date"] + cols]
-    interactive_table(df)
+    df[date_name] = df[date_name].dt.strftime("%m/%d/%Y")
+    cols = df.drop(date_name, axis=1).columns.tolist()
+    df = df[[date_name] + cols]
+    return df
 
 
 def main():
@@ -328,11 +327,13 @@ def main():
             sales_st = st.empty()
 
     # Plotting the sales data
-    st.subheader(key_features)
+    # [TODO] - zeinovich - how to print out
+    plots_section = st.expander("Plots")
+    plots_section.subheader(key_features)
 
     # Filter data by the selected time window
     if len(filtered_sales) > 0:
-        cutoff = st.selectbox(
+        cutoff = plots_section.selectbox(
             "Display history",
             ["1-week", "1-month", "3-month", "1-year", "All"],
             index=2,
@@ -351,7 +352,7 @@ def main():
             title="Sales over Time",
         )
         sales_plot = add_events(event_dates, sales_plot)
-        sales_st = st.empty()
+        sales_st = plots_section.empty()
         sales_st.plotly_chart(sales_plot)
 
         # # Plotting the price data
@@ -421,8 +422,10 @@ def main():
         forecast_data = st.session_state["response"]
         # st.success("Forecast generated successfully!")
 
+        table = st.expander("Forecast Table")
         # Display the forecast data
-        process_forecast_table(forecast_data)
+        forecast_data = process_forecast_table(forecast_data, date_name)
+        table.data_editor(forecast_data, use_container_width=True)
 
     else:
         st.error("Failed to get forecast. Please check your settings and try again.")
