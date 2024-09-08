@@ -10,6 +10,7 @@ Author: zeinovich
 
 from datetime import timedelta
 import requests  # dev
+from typing import List
 
 import streamlit as st
 from itables.streamlit import interactive_table
@@ -20,8 +21,23 @@ import numpy as np  # dev
 from plots import sku_plot, add_events, forecast_plot
 
 BACKEND_URL = "http://localhost:8000/forecast"
-MODELS_URL = "http://localhost:8000/models"
 TIMEOUT = 60  # HTTP timeout in seconds
+
+DATES = "./data/raw/shop_sales_dates.csv"
+
+_models = [
+    "XGBoost",
+    "LightGBM",
+    "Prophet",
+    "Etna",
+]
+
+_metrics = [
+    "MSE",
+    "RMSE",
+    "MAE",
+    "MAPE",
+]
 
 
 # Function to validate that the horizon is greater than the granularity
@@ -36,7 +52,7 @@ def validate_horizon_vs_granularity(horizon, granularity):
 
 
 # [TODO] - zeinovich - make adaptive form for file download
-def upload_data():
+def upload_standard_data():
     dates_file = st.sidebar.file_uploader("Upload dates CSV", type="csv")
     sales_file = st.sidebar.file_uploader("Upload Sales CSV", type="csv")
     prices_file = st.sidebar.file_uploader("Upload Prices CSV", type="csv")
@@ -66,9 +82,37 @@ def upload_data():
     return dates_file, sales_file, prices_file
 
 
+def upload_data():
+    sales_file = st.sidebar.file_uploader("Upload Sales CSV", type="csv")
+
+    css = """
+        <style>
+            [data-testid='stFileUploader'] {
+                width: max-content;
+            }
+            [data-testid='stFileUploader'] section {
+                padding: 0;
+                float: left;
+            }
+            [data-testid='stFileUploader'] section > input + div {
+                display: none;
+            }
+            [data-testid='stFileUploader'] section + div {
+                float: right;
+                padding-top: 0;
+            }
+
+        </style>
+    """
+
+    st.sidebar.markdown(css, unsafe_allow_html=True)
+
+    return sales_file
+
+
 # [TODO] - zeinovich - move to preprocessing pipeline
 # [TODO] - zeinovich AutoML - how to pass DF to backend
-def merge(
+def default_merge(
     dates: pd.DataFrame, sales: pd.DataFrame, prices: pd.DataFrame
 ) -> pd.DataFrame:
     """
@@ -96,7 +140,7 @@ def merge(
         suffixes=("", ""),
     )
 
-    # merge on (wm_yr_wk, item_id) to get price for particular week
+    # default_merge on (wm_yr_wk, item_id) to get price for particular week
     sales_df = pd.merge(
         left=sales_df,
         right=prices[["item_id", "wm_yr_wk", "sell_price"]],
@@ -110,12 +154,12 @@ def merge(
 
 
 # [TODO] - zeinovich - adapt for different datasets
-def prepare_datasets(dates_file, sales_file, prices_file):
+def default_prepare_datasets(dates_file, sales_file, prices_file):
     dates = pd.read_csv(dates_file)
     sales = pd.read_csv(sales_file)
     prices = pd.read_csv(prices_file)
 
-    sales_df = merge(dates, sales, prices)
+    sales_df = default_merge(dates, sales, prices)
 
     return sales_df, dates
 
@@ -125,17 +169,33 @@ def reset_forecast():
         del st.session_state["response"]
 
 
-def get_forecast_settings(sku_list, store_list):
+def get_dataset_features(df: pd.DataFrame):
+    key_names = st.sidebar.multiselect(
+        "Select key columns", df.columns.tolist(), on_change=reset_forecast
+    )
+    key_lists = [df[k].unique().tolist() for k in key_names]
+
+    target_name = st.sidebar.selectbox(
+        "Select target column", df.columns.tolist(), on_change=reset_forecast
+    )
+    date_name = st.sidebar.selectbox(
+        "Select date column", df.columns.tolist(), on_change=reset_forecast
+    )
+    key_features = {
+        n: st.sidebar.selectbox(
+            f"Select {n}", sorted(key_list), on_change=reset_forecast
+        )
+        for n, key_list in zip(key_names, key_lists)
+    }
+
+    return target_name, date_name, key_features
+
+
+def get_forecast_settings():
     # Assuming SKU and Store columns exist in sales and prices
 
     # SKU and Store selection
-    sku = st.sidebar.selectbox("Select SKU", sku_list, on_change=reset_forecast)
-    store = st.sidebar.selectbox(
-        "Select Store",
-        store_list,
-        on_change=reset_forecast,
-    )
-
+    # [TODO] - zeinovich - multiSKU
     st.sidebar.subheader("Forecast Settings")
     horizon = st.sidebar.selectbox(
         "Select Forecast Horizon",
@@ -145,8 +205,7 @@ def get_forecast_settings(sku_list, store_list):
     # [TODO] - zeinovich - add aggregation of target
     granularity = st.sidebar.selectbox(
         "Select Granularity",
-        # ["1-day", "1-week", "1-month"],
-        ["1-day"],
+        ["1-day", "1-week", "1-month"],
         on_change=reset_forecast,
     )
     # Check that the horizon is greater than granularity
@@ -157,16 +216,20 @@ def get_forecast_settings(sku_list, store_list):
         st.stop()
 
     # Model selection (this is a simple list of boosting algorithms for now)
-    # [TODO] - zeinovich - postprocessing of response
-    # models_list = requests.post(MODELS_URL, timeout=TIMEOUT)
-    models_list = ["XGBoost"]
+
     model = st.sidebar.selectbox(
         "Select Model",
-        models_list,
+        _models,
         on_change=reset_forecast,
     )
 
-    return sku, store, h_int, g_int, model
+    metric = st.sidebar.selectbox(
+        "Select Metric",
+        _metrics,
+        on_change=reset_forecast,
+    )
+
+    return h_int, g_int, model, metric
 
 
 def filter_by_time_window(
@@ -214,39 +277,58 @@ def main():
     st.title("Demand Forecasting")
 
     # File upload section in the sidebar
-    st.sidebar.subheader("Upload CSV Files")
+    st.sidebar.subheader("Upload data")
 
-    dates_file, sales_file, prices_file = upload_data()
+    if st.sidebar.radio("Standard Format", ["Yes", "No"]) == "Yes":
+        dates_file, sales_file, prices_file = upload_standard_data()
 
-    # Load the uploaded data
-    if dates_file and sales_file and prices_file:
-        sales_df, dates = prepare_datasets(dates_file, sales_file, prices_file)
+        # Load the uploaded data
+        if dates_file and sales_file and prices_file:
+            sales_df, dates = default_prepare_datasets(
+                dates_file, sales_file, prices_file
+            )
+        else:
+            st.sidebar.warning(
+                "Please upload all three CSV files (dates, Sales, Prices)."
+            )
+            st.stop()
+
     else:
-        st.sidebar.warning("Please upload all three CSV files (dates, Sales, Prices).")
-        st.stop()
+        sales_file = upload_data()
 
+        if sales_file:
+            sales_df = pd.read_csv(sales_file)
+            dates = pd.read_csv(DATES)
+        else:
+            st.sidebar.warning("Please upload CSV file")
+            st.stop()
     # [TODO] - zeinovich - make adaptive form for target cols selection
     # [TODO] - zeinovich - place value if no store selection
     # make it look more like passing list of lists
     # name selectboxes as their columns
-    sku_list = sales_df["SKU"].unique()
-    store_list = sorted(sales_df["store_id"].unique())
-    sku, store, horizon, granularity, model = get_forecast_settings(
-        sku_list, store_list
-    )
+    # sku_list = sales_df["SKU"].unique()
+    # store_list = sorted(sales_df["store_id"].unique())
+
+    target_name, date_name, key_features = get_dataset_features(sales_df)
+
+    # if not st.sidebar.button("Submit"):
+    #     st.stop()
+
+    horizon, granularity, model, metric = get_forecast_settings()
 
     # Filter the data based on selected SKU and Store
-    filtered_sales = sales_df[
-        (sales_df["SKU"] == sku) & (sales_df["store_id"] == store)
-    ]
+    filtered_sales = sales_df.copy()
 
-    if len(filtered_sales) == 0:
-        st.warning(f"SKU {sku} has never been sold in store {store}")
-        # [TODO] - zeinovich - how render plots with no history
-        sales_st = st.empty()
+    for col, val in key_features.items():
+        filtered_sales = filtered_sales[filtered_sales[col] == val]
+
+        if len(filtered_sales) == 0:
+            st.warning(f'History for column "{col}" doesn\'t have value "{val}"')
+            # [TODO] - zeinovich - how render plots with no history
+            sales_st = st.empty()
 
     # Plotting the sales data
-    st.subheader(f"Sales for SKU {sku} at Store {store}")
+    st.subheader(key_features)
 
     # Filter data by the selected time window
     if len(filtered_sales) > 0:
@@ -255,47 +337,50 @@ def main():
             ["1-week", "1-month", "3-month", "1-year", "All"],
             index=2,
         )
-        filtered_sales = filter_by_time_window(filtered_sales, "date", cutoff)
-        filtered_dates = filter_by_time_window(dates, "date", cutoff)
+        sales_for_display = filter_by_time_window(filtered_sales, date_name, cutoff)
+        dates_for_display = filter_by_time_window(dates, date_name, cutoff)
 
-        event_dates = filtered_dates[filtered_dates["event_type_1"].notna()][
+        event_dates = dates_for_display[dates_for_display["event_type_1"].notna()][
             ["date", "event_name_1", "event_type_1"]
         ]
+        # [TODO] - multiSKU
         sales_plot = sku_plot(
-            filtered_sales,
-            x="date",
-            y="cnt",
+            sales_for_display,
+            x=date_name,
+            y=target_name,
             title="Sales over Time",
-            labels={"date": "Date", "cnt": "Items Sold"},
         )
         sales_plot = add_events(event_dates, sales_plot)
         sales_st = st.empty()
         sales_st.plotly_chart(sales_plot)
 
-        # Plotting the price data
-        price_plot = sku_plot(
-            filtered_sales,
-            x="date",
-            y="sell_price",
-            title="Prices Over Time",
-            labels={"date": "Date", "sell_price": "Sell Price"},
-        )
-        price_plot = add_events(event_dates, price_plot)
-        st.plotly_chart(price_plot)
+        # # Plotting the price data
+        # # [TODO] - multiSKU
+        # price_plot = sku_plot(
+        #     sales_for_display,
+        #     x="date",
+        #     y="sell_price",
+        #     title="Prices Over Time",
+        #     labels={"date": "Date", "sell_price": "Sell Price"},
+        # )
+        # price_plot = add_events(event_dates, price_plot)
+        # st.plotly_chart(price_plot)
 
     # Button to trigger the forecast request
     if st.sidebar.button("Get Forecast"):
         # Create payload with forecast settings
         payload = {
-            "sku": sku,
-            "store": store,
+            "key_features": key_features,
+            "data": filtered_sales,
             "horizon": horizon,
             "granularity": granularity,
             "model": model,
+            "metric": metric,
         }
 
         # Send request to the backend (example backend port assumed to be 8000)
         # Update this with the correct backend URL
+        # [TODO] - zeinovich - postprocessing of response
         # response = requests.post(BACKEND_URL, json=payload, timeout=TIMEOUT)
         response = np.random.normal(
             filtered_sales["cnt"].mean(),
@@ -304,7 +389,7 @@ def main():
         )
         response = pd.DataFrame(response, columns=["predicted"])
         response["date"] = [
-            filtered_dates["date"].tolist()[-1] + timedelta(days=1) * (i + 1)
+            filtered_sales["date"].tolist()[-1] + timedelta(days=1) * (i + 1)
             for i in range(horizon // granularity)
         ]
         response["upper"] = np.random.normal(
@@ -348,7 +433,6 @@ def main():
     sales_plot = forecast_plot(
         forecast_data,
         sales_plot,
-        add_trace={"row": 1, "col": 1},
         scatter_args={"line": {"color": "Black", "dash": "dash"}},
     )
     sales_st.plotly_chart(sales_plot)

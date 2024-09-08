@@ -3,7 +3,6 @@ from datetime import timedelta
 
 import pandas as pd
 from plotly import graph_objects as go
-from plotly import subplots
 
 _pallette = [
     "#5ba300",
@@ -14,9 +13,7 @@ _pallette = [
 ]
 
 
-def sku_plot(
-    df: pd.DataFrame, x: str, y: str, title: str, labels: Dict[str, str]
-) -> go.Figure:
+def sku_plot(df: pd.DataFrame, x: str, y: str, title: str) -> go.Figure:
     """
     Plots line plot from data. Data distribution is appended to the left of a line plot
 
@@ -33,9 +30,7 @@ def sku_plot(
     # Create 2 subplots with shared Y-axis
     # Left subplot - Line plot (80% width)
     # Right subplot - histogram of values in y column (20% width)
-    plot = subplots.make_subplots(
-        rows=1, cols=2, shared_yaxes=True, column_widths=[0.8, 0.2]
-    )
+    plot = go.Figure()
 
     plot.add_trace(
         go.Scatter(
@@ -43,24 +38,7 @@ def sku_plot(
             y=df[y],
             mode="lines",
             showlegend=False,
-        ),
-        row=1,
-        col=1,
-    )
-
-    # Add vertical histogram
-    plot.add_trace(
-        go.Histogram(
-            y=df[y],
-            histfunc="count",
-            histnorm="percent",
-            opacity=0.6,
-            marker=dict(color="LightCoral"),
-            orientation="h",
-            showlegend=False,
-        ),
-        row=1,
-        col=2,
+        )
     )
 
     min_y, max_y = df[y].min(), df[y].max()
@@ -89,10 +67,7 @@ def sku_plot(
         showlegend=True,
     )
 
-    plot.update_layout(title=title, xaxis_title=labels[x], yaxis_title=labels[y])
-    # Set right sublot x-axis label directly
-    plot["layout"]["xaxis2"]["title"] = "Fraction, %"
-    plot.update_layout(showlegend=True)
+    plot.update_layout(title=title, showlegend=True)
 
     return plot
 
@@ -150,7 +125,6 @@ def add_events(event_dates: pd.DataFrame, plot: go.Figure) -> go.Figure:
 def forecast_plot(
     forecast_data: pd.DataFrame,
     fig: go.Figure = None,
-    add_trace: Dict[str, Any] = None,
     scatter_args: Dict[str, Any] = None,
 ) -> go.Figure:
     """
@@ -178,8 +152,7 @@ def forecast_plot(
             name="Prediction",
             showlegend=False,
             **scatter_args,
-        ),
-        **add_trace,
+        )
     )
 
     # Prediction intervals (Uncertainty bounds) shaded area
@@ -191,8 +164,7 @@ def forecast_plot(
             line=dict(width=0),
             name="Upper Bound",
             showlegend=False,
-        ),
-        **add_trace,
+        )
     )
 
     fig.add_trace(
@@ -205,8 +177,7 @@ def forecast_plot(
             fillcolor="rgba(68, 68, 68, 0.3)",
             name="Lower Bound",
             showlegend=False,
-        ),
-        **add_trace,
+        )
     )
 
     fig.update_layout(
