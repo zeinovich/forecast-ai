@@ -14,6 +14,7 @@ async def get_forecast(payload: dict):
     date_name = payload["date_name"]
     segment_name = payload["segment_name"]
     data = payload["data"]
+    target_segment_names = payload["target_segment_names"]
     horizon = payload["horizon"]
     granularity = payload["granularity"]
     model = payload["model"]
@@ -25,6 +26,7 @@ async def get_forecast(payload: dict):
         "date_name": date_name,
         "segment_name": segment_name,
         "data": data,
+        "target_segment_names": target_segment_names,
         "horizon": horizon,
         "granularity": granularity,
         "model": model,

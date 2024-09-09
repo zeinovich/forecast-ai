@@ -11,12 +11,12 @@ async def predict(payload: dict):
     """
     Интерфейс предсказания.
     Получает данные, предобрабатывает их и вызывает модель для предсказания и доверительных интервалов.
-    Возвращает закодированный датафрейм с колонками ["date", "pred", "upper", "lower"].
     """
     target_name = payload["target_name"]
     date_name = payload["date_name"]
     segment_name = payload["segment_name"]
     data = payload["data"]
+    target_segment_names = payload["target_segment_names"]
     horizon = payload["horizon"]
     granularity = payload["granularity"]
     model = payload["model"]
@@ -27,23 +27,17 @@ async def predict(payload: dict):
 
     df = preprocess_data(df, target_name, date_name, segment_name, granularity)
 
-    prediction_dates, predictions, upper_bound, lower_bound, metric_value = predict_with_model(df, horizon, model, metric)
+    prediction_df, metrics_df = predict_with_model(df, target_segment_names, horizon, model, metric)
 
-    df[date_name] = pd.to_datetime(df['timestamp'])
-    df[segment_name] = df['segment']
-    df[target_name] = df['target']
-    df.drop(columns=['timestamp', 'segment', 'target'], inplace=True)
+    buffer_pred = BytesIO()
+    prediction_df.to_csv(buffer_pred, index=False)
+    encoded_predictions = base64.b64encode(buffer_pred.getvalue()).decode('utf-8')
 
-    result_df = pd.DataFrame({
-        "date": prediction_dates,
-        "pred": predictions,
-        "upper": upper_bound,
-        "lower": lower_bound,
-        "metric_score": metric_value
-    })
+    buffer_metrics = BytesIO()
+    metrics_df.to_csv(buffer_metrics, index=False)
+    encoded_metrics = base64.b64encode(buffer_metrics.getvalue()).decode('utf-8')
 
-    buffer = BytesIO()
-    result_df.to_csv(buffer, index=False)
-    encoded_result = base64.b64encode(buffer.getvalue()).decode('utf-8')
-
-    return {"encoded_dataframe": encoded_result}
+    return {
+        "encoded_predictions": encoded_predictions,
+        "encoded_metrics": encoded_metrics
+    }

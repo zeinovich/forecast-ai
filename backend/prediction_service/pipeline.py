@@ -1,5 +1,5 @@
 from etna.datasets import TSDataset
-from etna.metrics import SMAPE, MAE, MSE
+from etna.metrics import SMAPE, MAE, MSE, MAPE
 from etna.models import (
     AutoARIMAModel,
     ProphetModel,
@@ -31,7 +31,7 @@ def preprocess_data(df: pd.DataFrame, target_name: str, date_name: str, segment_
     df['event_type_2_encoded'] = label_encoder.fit_transform(df['event_type_2'].fillna('0'))
     df.drop(columns=['event_name_1', 'event_type_1', 'event_name_2', 'event_type_2'], inplace=True)
 
-    df['timestamp'] = pd.to_datetime(df[date_name])
+    df['timestamp'] = df[date_name]
     df['segment'] = df[segment_name]
     df['target'] = df[target_name]
     
@@ -106,15 +106,16 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     # ...
     return transformed_df
 
-def predict_with_model(df: TSDataset, horizon: int, model: str, metric: str):
+def predict_with_model(df: TSDataset, target_segment_names: list[str], horizon: int, model: str, metric: bool):
     """
     Интерфейс предсказания через выбранную модель.
     Модели подключаются отдельно.
     
     :param df: данные для предсказания
+    :param target_segment_names: сегменты для которых неодходимо предсказать
     :param horizon: горизонт предсказания
     :param model: модель, которая будет использована
-    :param metric: метрика для оценки предсказания
+    :param metric: необходимо ли возвращать значения метрик
     :return: предсказанные значения
     """
     match model:
@@ -139,32 +140,11 @@ def predict_with_model(df: TSDataset, horizon: int, model: str, metric: str):
         
     pipeline = Pipeline(model=model_instance, horizon=horizon)
     pipeline.fit(df)
-    forecast_ts = pipeline.forecast(prediction_interval=True)
-    forecast_df = forecast_ts.df
-    predictions = forecast_df['target'].values
-    upper_bound = forecast_df['target_upper'].values if 'target_upper' in forecast_df.columns else None
-    lower_bound = forecast_df['target_lower'].values if 'target_lower' in forecast_df.columns else None
+    target_segments = df[:, target_segment_names, :]
+    forecast_ts = pipeline.forecast(ts=target_segments, prediction_interval=True)
+    forecast_df = forecast_ts.df.loc[:, pd.IndexSlice[:, ['target', 'target_0.025', 'target_0.975']]]
 
-    prediction_dates = forecast_df.index.get_level_values('timestamp').values
     if metric:
-        metric_instance = get_metric_instance(metric)
-        metric_value = metric_instance(y_true=df[:, :, 'target'], y_pred=forecast_df[:, :, 'target'])
+        metrics_df, _, _ = pipeline.backtest(ts=ts, metrics=[MAE(), MSE(), MAPE(), SMAPE()], n_folds=3, aggregate_metrics=True)
 
-    return prediction_dates, predictions, upper_bound, lower_bound, metric_value
-
-def get_metric_instance(metric: str):
-    """
-    Возвращает экземпляр метрики на основе её названия.
-    
-    :param metric: название метрики
-    :return: объект метрики
-    """
-    match metric:
-        case "smape":
-            return SMAPE()
-        case "mae":
-            return MAE()
-        case "mse":
-            return MSE()
-        case _:
-            raise NotImplementedError(f"Metric {metric} is not implemented yet.")
+    return forecast_df, metrics_df
