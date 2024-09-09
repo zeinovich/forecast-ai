@@ -17,7 +17,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np  # dev
 
-from plots import sku_plot, add_events, forecast_plot
+from plots import sku_plot, add_events, add_minmax, forecast_plot
 
 BACKEND_URL = "http://localhost:8000/forecast"
 TIMEOUT = 60  # HTTP timeout in seconds
@@ -169,10 +169,14 @@ def reset_forecast():
 
 
 def get_dataset_features(df: pd.DataFrame):
-    key_names = st.sidebar.multiselect(
-        "Select key columns", df.columns.tolist(), on_change=reset_forecast
+    segment_name = st.sidebar.selectbox(
+        "Select ID column", df.columns.tolist(), on_change=reset_forecast
     )
-    key_lists = [df[k].unique().tolist() for k in key_names]
+    unique_segments = df[segment_name].unique().tolist()
+
+    segments = st.sidebar.multiselect(
+        f"Select {segment_name}", sorted(unique_segments), on_change=reset_forecast
+    )
 
     target_name = st.sidebar.selectbox(
         "Select target column", df.columns.tolist(), on_change=reset_forecast
@@ -180,14 +184,8 @@ def get_dataset_features(df: pd.DataFrame):
     date_name = st.sidebar.selectbox(
         "Select date column", df.columns.tolist(), on_change=reset_forecast
     )
-    key_features = {
-        n: st.sidebar.selectbox(
-            f"Select {n}", sorted(key_list), on_change=reset_forecast
-        )
-        for n, key_list in zip(key_names, key_lists)
-    }
 
-    return target_name, date_name, key_features
+    return target_name, date_name, segment_name, segments
 
 
 def get_forecast_settings():
@@ -278,7 +276,9 @@ def main():
     # File upload section in the sidebar
     st.sidebar.subheader("Upload data")
 
-    if st.sidebar.radio("Standard Format", ["Yes", "No"]) == "Yes":
+    is_standard_format = st.sidebar.radio("Standard Format", ["Yes", "No"]) == "Yes"
+
+    if is_standard_format:
         dates_file, sales_file, prices_file = upload_standard_data()
 
         # Load the uploaded data
@@ -301,77 +301,36 @@ def main():
         else:
             st.sidebar.warning("Please upload CSV file")
             st.stop()
+
     # [TODO] - zeinovich - make adaptive form for target cols selection
     # [TODO] - zeinovich - place value if no store selection
-    # make it look more like passing list of lists
-    # name selectboxes as their columns
-    # sku_list = sales_df["SKU"].unique()
-    # store_list = sorted(sales_df["store_id"].unique())
-
-    target_name, date_name, key_features = get_dataset_features(sales_df)
-
-    # if not st.sidebar.button("Submit"):
-    #     st.stop()
+    target_name, date_name, segment_name, segments = get_dataset_features(sales_df)
 
     horizon, granularity, model, metric = get_forecast_settings()
 
     # Filter the data based on selected SKU and Store
     filtered_sales = sales_df.copy()
 
-    for col, val in key_features.items():
-        filtered_sales = filtered_sales[filtered_sales[col] == val]
+    filtered_sales = filtered_sales[filtered_sales[segment_name].isin(segments)]
 
-        if len(filtered_sales) == 0:
-            st.warning(f'History for column "{col}" doesn\'t have value "{val}"')
-            # [TODO] - zeinovich - how render plots with no history
-            sales_st = st.empty()
+    if len(filtered_sales) == 0:
+        st.warning(
+            f'History for column "{segment_name}" doesn\'t have value "{segments}"'
+        )
+        # [TODO] - zeinovich - how render plots with no history
+        sales_st = st.empty()
 
-    # Plotting the sales data
-    # [TODO] - zeinovich - how to print out
-    plots_section = st.expander("Plots")
-    plots_section.subheader(key_features)
-
-    # Filter data by the selected time window
     if len(filtered_sales) > 0:
-        cutoff = plots_section.selectbox(
-            "Display history",
-            ["1-week", "1-month", "3-month", "1-year", "All"],
-            index=2,
-        )
-        sales_for_display = filter_by_time_window(filtered_sales, date_name, cutoff)
-        dates_for_display = filter_by_time_window(dates, date_name, cutoff)
-
-        event_dates = dates_for_display[dates_for_display["event_type_1"].notna()][
-            ["date", "event_name_1", "event_type_1"]
-        ]
-        # [TODO] - multiSKU
-        sales_plot = sku_plot(
-            sales_for_display,
-            x=date_name,
-            y=target_name,
-            title="Sales over Time",
-        )
-        sales_plot = add_events(event_dates, sales_plot)
-        sales_st = plots_section.empty()
-        sales_st.plotly_chart(sales_plot)
-
-        # # Plotting the price data
-        # # [TODO] - multiSKU
-        # price_plot = sku_plot(
-        #     sales_for_display,
-        #     x="date",
-        #     y="sell_price",
-        #     title="Prices Over Time",
-        #     labels={"date": "Date", "sell_price": "Sell Price"},
-        # )
-        # price_plot = add_events(event_dates, price_plot)
-        # st.plotly_chart(price_plot)
+        filtered_sales = filtered_sales.sort_values(by=date_name)
 
     # Button to trigger the forecast request
     if st.sidebar.button("Get Forecast"):
         # Create payload with forecast settings
         payload = {
-            "key_features": key_features,
+            "target_name": target_name,
+            "date_name": date_name,
+            "segment_name": segment_name,
+            "target_segment_names": segments,
             "data": filtered_sales,
             "horizon": horizon,
             "granularity": granularity,
@@ -424,8 +383,8 @@ def main():
 
         table = st.expander("Forecast Table")
         # Display the forecast data
-        forecast_data = process_forecast_table(forecast_data, date_name)
-        table.data_editor(forecast_data, use_container_width=True)
+        forecast_data_for_display = process_forecast_table(forecast_data, date_name)
+        table.data_editor(forecast_data_for_display, use_container_width=True)
 
     else:
         st.error("Failed to get forecast. Please check your settings and try again.")
@@ -433,11 +392,61 @@ def main():
 
     # # [TODO] - zeinovich - check if historical is present
     # # and preprocess it
+    # Plotting the sales data
+    # [TODO] - zeinovich - how to print out
+    plots_section = st.expander("Plots")
+    plots_section.subheader(f"Forecast for {', '.join(segments)}")
+    cutoff = plots_section.selectbox(
+        "Display history",
+        ["1-week", "1-month", "3-month", "1-year", "All"],
+        index=2,
+    )
+    sales_st = plots_section.empty()
+    sales_plot = None
+
+    # Filter data by the selected time window
+    if len(filtered_sales) > 0:
+        sales_for_display = filter_by_time_window(filtered_sales, date_name, cutoff)
+        dates_for_display = filter_by_time_window(dates, date_name, cutoff)
+
+        event_dates = dates_for_display[dates_for_display["event_type_1"].notna()][
+            ["date", "event_name_1", "event_type_1"]
+        ]
+        # [TODO] - multiSKU
+        sales_plot = sku_plot(
+            sales_for_display,
+            x=date_name,
+            y=target_name,
+            title="Sales over Time",
+        )
+        sales_plot = add_events(event_dates, sales_plot)
+        forecast_data.loc[len(forecast_data)] = pd.Series(
+            [
+                filtered_sales[date_name].iloc[-1],
+                filtered_sales[target_name].iloc[-1],
+                filtered_sales[target_name].iloc[-1],
+                filtered_sales[target_name].iloc[-1],
+            ],
+            index=["date", "predicted", "upper", "lower"],
+        )
+
+        forecast_data = forecast_data.sort_values("date")
+
+        min_y, max_y = (
+            sales_for_display[target_name].min(),
+            sales_for_display[target_name].max(),
+        )
+
+        min_x, max_x = (sales_for_display[date_name].min(), forecast_data["date"].max())
+
+        sales_plot = add_minmax(sales_plot, min_y, max_y, min_x, max_x)
+
     sales_plot = forecast_plot(
         forecast_data,
         sales_plot,
-        scatter_args={"line": {"color": "Black", "dash": "dash"}},
+        scatter_args={"line": {"color": "Green", "dash": "dash"}},
     )
+
     sales_st.plotly_chart(sales_plot)
 
 
