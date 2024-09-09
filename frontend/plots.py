@@ -41,9 +41,12 @@ def sku_plot(df: pd.DataFrame, x: str, y: str, title: str) -> go.Figure:
         )
     )
 
-    min_y, max_y = df[y].min(), df[y].max()
-    min_x, max_x = df[x].min(), df[x].max()
+    return plot
 
+
+def add_minmax(
+    plot: go.Figure, min_y: float, max_y: float, min_x: float, max_x: float
+) -> go.Figure:
     # Add dashed horizontal lines for min and max Y with annotations
     plot.add_shape(
         type="line",
@@ -66,8 +69,6 @@ def sku_plot(df: pd.DataFrame, x: str, y: str, title: str) -> go.Figure:
         name=f"Max: {max_y}",
         showlegend=True,
     )
-
-    plot.update_layout(title=title, showlegend=True)
 
     return plot
 
@@ -143,6 +144,9 @@ def forecast_plot(
     """
     if not fig:
         fig = go.Figure()
+
+    print("plotting forecast")
+    print(len(forecast_data))
 
     fig.add_trace(
         go.Scatter(
