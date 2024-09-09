@@ -23,30 +23,14 @@ def default_merge(
     Returns:
         pd.DataFrame: Merged dataframe
     """
-
-    sales["SKU"] = sales["item_id"].apply(lambda x: x[-3:])
     dates["date"] = pd.to_datetime(dates["date"])
 
-    sales_df = pd.merge(
-        left=sales,
-        right=dates,
-        how="left",
-        left_on="date_id",
-        right_on="date_id",
-        suffixes=("", ""),
+    merged_sales_dates = pd.merge(sales, dates, on="date_id", how="left")
+    final_merged_data = pd.merge(
+        merged_sales_dates, prices, on=["store_id", "item_id", "wm_yr_wk"], how="left"
     )
 
-    # default_merge on (wm_yr_wk, item_id) to get price for particular week
-    sales_df = pd.merge(
-        left=sales_df,
-        right=prices[["item_id", "wm_yr_wk", "sell_price"]],
-        how="left",
-        left_on=("wm_yr_wk", "item_id"),
-        right_on=("wm_yr_wk", "item_id"),
-        suffixes=("", ""),
-    )
-
-    return sales_df
+    return final_merged_data
 
 
 # [TODO] - zeinovich - adapt for different datasets
