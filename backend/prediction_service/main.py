@@ -21,13 +21,14 @@ async def predict(payload: dict):
     granularity = payload["granularity"]
     model_name = payload["model_name"]
     metric = payload["metric"]
+    top_k_features = payload["top_k_features"]
 
     decoded_data = base64.b64decode(data)
     df = pd.read_csv(BytesIO(decoded_data))
 
     df = preprocess_data(df, target_name, date_name, segment_name, granularity)
 
-    prediction_df, metrics_df = predict_with_model(df, target_segment_names, horizon, model_name, metric)
+    prediction_df, metrics_df = predict_with_model(df, target_segment_names, horizon, model_name, metric, top_k_features=top_k_features)
 
     buffer_pred = BytesIO()
     prediction_df.to_csv(buffer_pred, index=False)

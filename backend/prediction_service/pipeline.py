@@ -8,8 +8,8 @@ from etna.transforms import (
     LagTransform,
     RobustScalerTransform,
     FourierTransform,
-    BoxCoxTransform,
-    SegmentEncoderTransform
+    SegmentEncoderTransform,
+    TreeFeatureSelectionTransform
 )
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
@@ -43,6 +43,9 @@ def preprocess_data(df: pd.DataFrame, target_name: str, date_name: str, segment_
         ts_dataset = ts_dataset.to_period('M')
     df = remove_outliners(df)
     df = generate_features_etna(df)
+
+    ts_dataset.df = ts_dataset.df.applymap(lambda x: 1 if x is True else (0 if x is False else x))
+    ts_dataset.df = ts_dataset.df.fillna(0)
     return df
 
 def remove_outliners(df: TSDataset):
@@ -71,14 +74,12 @@ def generate_features_etna(df: TSDataset):
     lag_transform = LagTransform(in_column="target", lags=[7, 14, 30])
     fourier_transform = FourierTransform(period=365.25, order=3)
     scaler_transform = RobustScalerTransform(in_column="target")
-    boxcox_transform = BoxCoxTransform(in_column="target")
     segment_encoder = SegmentEncoderTransform()
     df.fit_transform([
         date_flags_transform,
         lag_transform,
         fourier_transform,
         scaler_transform,
-        boxcox_transform,
         segment_encoder
     ])
     return df
@@ -122,7 +123,7 @@ def import_model_class(model_name: str):
     model_class = getattr(module, class_name)
     return model_class
 
-def predict_with_model(df: TSDataset, target_segment_names: list[str], horizon: int, model_name: str, metric: bool):
+def predict_with_model(df: TSDataset, target_segment_names: list[str], horizon: int, model_name: str, metric: bool, top_k_features: int):
     """
     Интерфейс предсказания через выбранную модель.
     Модели подключаются отдельно.
@@ -136,11 +137,18 @@ def predict_with_model(df: TSDataset, target_segment_names: list[str], horizon: 
     """
     model_class = import_model_class(model_name)
     model_instance = model_class()
+
+    transform = TreeFeatureSelectionTransform(
+        model='catboost',
+        top_k=top_k_features,
+    )
         
-    pipeline = Pipeline(model=model_instance, horizon=horizon)
+    pipeline = Pipeline(model=model_instance, transforms=[transform], horizon=horizon)
     pipeline.fit(df)
+    
     target_segments = df[:, target_segment_names, :]
-    forecast_ts = pipeline.forecast(ts=target_segments, prediction_interval=True)
+    target_ts = TSDataset(target_segments, freq=df.freq)
+    forecast_ts = pipeline.forecast(ts=target_ts, prediction_interval=True)
     forecast_df = forecast_ts.df.loc[:, pd.IndexSlice[:, ['target', 'target_0.025', 'target_0.975']]]
 
     if metric:
