@@ -27,11 +27,11 @@ from preprocessing import (
 )
 
 BACKEND_URL = "http://localhost:8000/forecast"
-TIMEOUT = 60  # HTTP timeout in seconds
+TIMEOUT = 300  # HTTP timeout in seconds
 
 DATES = "./data/raw/shop_sales_dates.csv"
 
-_models = ["linear"]
+_models = ["linear.LinearPerSegmentModel", "AutoARIMAModel", "prophet.ProphetModel"]
 
 _metrics = [
     "MSE",

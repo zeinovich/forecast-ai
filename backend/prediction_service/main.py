@@ -29,6 +29,7 @@ async def predict(payload: dict):
 
     df = preprocess_data(df, target_name, date_name, segment_name, granularity)
 
+    print(type(df))
     prediction_df, metrics_df = predict_with_model(
         df,
         target_segment_names,

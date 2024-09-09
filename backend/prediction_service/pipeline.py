@@ -43,7 +43,13 @@ def preprocess_data(
         df["event_type_2"].fillna("0")
     )
     df.drop(
-        columns=["event_name_1", "event_type_1", "event_name_2", "event_type_2"],
+        columns=[
+            "event_name_1",
+            "event_type_1",
+            "event_name_2",
+            "event_type_2",
+            "store_id",
+        ],
         inplace=True,
     )
 
@@ -68,7 +74,7 @@ def preprocess_data(
         lambda x: 1 if x is True else (0 if x is False else x)
     )
     ts_dataset.df = ts_dataset.df.fillna(0)
-    return df
+    return ts_dataset
 
 
 def remove_outliners(df: TSDataset):
@@ -160,6 +166,7 @@ def import_model_class(model_name: str):
 
     module = importlib.import_module(module_name)
     model_class = getattr(module, class_name)
+
     return model_class
 
 
@@ -183,7 +190,6 @@ def predict_with_model(
     :return: предсказанные значения
     """
     model_class = import_model_class(model_name)
-    print(model_class)
     model_instance = model_class()
 
     transform = TreeFeatureSelectionTransform(
@@ -191,11 +197,16 @@ def predict_with_model(
         top_k=top_k_features,
     )
 
-    pipeline = Pipeline(model=model_instance, transforms=[transform], horizon=horizon)
+    pipeline = Pipeline(
+        model=model_instance,
+        transforms=[transform],
+        horizon=horizon,
+    )
     pipeline.fit(df)
 
     target_segments = df[:, target_segment_names, :]
     target_ts = TSDataset(target_segments, freq=df.freq)
+
     forecast_ts = pipeline.forecast(ts=target_ts, prediction_interval=True)
     forecast_df = forecast_ts.df.loc[
         :, pd.IndexSlice[:, ["target", "target_0.025", "target_0.975"]]
