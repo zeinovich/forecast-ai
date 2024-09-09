@@ -1,5 +1,9 @@
-import pandas as pd
 from datetime import timedelta
+from typing import Dict, Any
+from io import BytesIO
+import base64
+
+import pandas as pd
 
 
 # [TODO] - zeinovich - move to preprocessing pipeline
@@ -25,7 +29,7 @@ def default_merge(
 
     sales_df = pd.merge(
         left=sales,
-        right=dates[["date_id", "wm_yr_wk", "date"]],
+        right=dates,
         how="left",
         left_on="date_id",
         right_on="date_id",
@@ -96,3 +100,16 @@ def filter_by_time_window(
         return df
 
     return df[df[date_column] >= start_date]
+
+
+def encode_dataframe(df: pd.DataFrame) -> Dict[Any, Any]:
+    buffer_pred = BytesIO()
+    df.to_csv(buffer_pred, index=False)
+    encoded = base64.b64encode(buffer_pred.getvalue()).decode("utf-8")
+    return encoded
+
+
+def decode_dataframe(data):
+    decoded_data = base64.b64decode(data)
+    df = pd.read_csv(BytesIO(decoded_data))
+    return df
