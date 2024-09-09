@@ -20,7 +20,7 @@ async def predict(payload: dict):
     target_segment_names = payload["target_segment_names"]
     horizon = payload["horizon"]
     granularity = payload["granularity"]
-    model_name = payload["model_name"]
+    model_name = payload["model"]
     metric = payload["metric"]
     top_k_features = payload["top_k_features"]
 

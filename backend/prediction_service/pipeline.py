@@ -55,12 +55,14 @@ def preprocess_data(
 
     df = generate_features(df)
     ts_dataset = TSDataset(df, freq="D")
+
     if granularity == "weekly":
         ts_dataset = ts_dataset.to_period("W")
     elif granularity == "monthly":
         ts_dataset = ts_dataset.to_period("M")
-    df = remove_outliners(df)
-    df = generate_features_etna(df)
+
+    ts_dataset = remove_outliners(ts_dataset)
+    ts_dataset = generate_features_etna(ts_dataset)
 
     ts_dataset.df = ts_dataset.df.applymap(
         lambda x: 1 if x is True else (0 if x is False else x)
@@ -75,16 +77,7 @@ def remove_outliners(df: TSDataset):
     return df
 
 
-# def remove_outliners(df: TSDataset):
-#     prophet_model = ProphetModel()
-#     outliers_transform = ModelOutliersTransform(
-#         model=prophet_model, in_column="target", threshold=3
-#     )
-#     df.fit_transform([outliers_transform])
-#     return df
-
-
-def generate_features_etna(ts: TSDataset) -> TSDataset:
+def generate_features_etna(df: TSDataset) -> TSDataset:
     """
     Генерация стандартных признаков для временных рядов с использованием Etna.
 
@@ -190,6 +183,7 @@ def predict_with_model(
     :return: предсказанные значения
     """
     model_class = import_model_class(model_name)
+    print(model_class)
     model_instance = model_class()
 
     transform = TreeFeatureSelectionTransform(

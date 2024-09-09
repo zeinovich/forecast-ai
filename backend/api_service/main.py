@@ -3,6 +3,10 @@ import requests
 import os
 
 app = FastAPI()
+PREDICTION_SERVICE_HOST = "localhost"
+CLUSTERING_SERVICE_HOST = "localhost"
+PREDICTION_SERVICE_PORT = 8001
+CLUSTERING_SERVICE_PORT = 8002
 
 
 @app.post("/forecast/")
@@ -22,7 +26,9 @@ async def get_forecast(payload: dict):
     metric = payload["metric"]
     top_k_features = payload["top_k_features"]
 
-    prediction_url = f"http://{os.getenv('PREDICTION_SERVICE_HOST')}:{os.getenv('PREDICTION_SERVICE_PORT')}/predict/"
+    prediction_url = (
+        f"http://{PREDICTION_SERVICE_HOST}:{PREDICTION_SERVICE_PORT}/predict/"
+    )
     response = requests.post(
         prediction_url,
         json={
@@ -50,7 +56,9 @@ async def get_clusters_dataset(payload: dict):
     """
     data = payload["data"]
 
-    clustering_url = f"http://{os.getenv('CLUSTERING_SERVICE_HOST')}:{os.getenv('CLUSTERING_SERVICE_PORT')}/clasterize/"
+    clustering_url = (
+        f"http://{CLUSTERING_SERVICE_HOST}:{CLUSTERING_SERVICE_PORT}/clusterize/"
+    )
     response = requests.post(
         clustering_url,
         json={

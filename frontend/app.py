@@ -245,6 +245,7 @@ def main():
             "granularity": granularity,
             "model": model,
             "metric": metric,
+            "top_k_features": 10,
         }
 
         # Send request to the backend (example backend port assumed to be 8000)
