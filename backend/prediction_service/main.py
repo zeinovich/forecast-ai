@@ -6,6 +6,7 @@ from pipeline import preprocess_data, predict_with_model
 
 app = FastAPI()
 
+
 @app.post("/predict/")
 async def predict(payload: dict):
     """
@@ -28,17 +29,24 @@ async def predict(payload: dict):
 
     df = preprocess_data(df, target_name, date_name, segment_name, granularity)
 
-    prediction_df, metrics_df = predict_with_model(df, target_segment_names, horizon, model_name, metric, top_k_features=top_k_features)
+    prediction_df, metrics_df = predict_with_model(
+        df,
+        target_segment_names,
+        horizon,
+        model_name,
+        metric,
+        top_k_features=top_k_features,
+    )
 
     buffer_pred = BytesIO()
     prediction_df.to_csv(buffer_pred, index=False)
-    encoded_predictions = base64.b64encode(buffer_pred.getvalue()).decode('utf-8')
+    encoded_predictions = base64.b64encode(buffer_pred.getvalue()).decode("utf-8")
 
     buffer_metrics = BytesIO()
     metrics_df.to_csv(buffer_metrics, index=False)
-    encoded_metrics = base64.b64encode(buffer_metrics.getvalue()).decode('utf-8')
+    encoded_metrics = base64.b64encode(buffer_metrics.getvalue()).decode("utf-8")
 
     return {
         "encoded_predictions": encoded_predictions,
-        "encoded_metrics": encoded_metrics
+        "encoded_metrics": encoded_metrics,
     }

@@ -22,6 +22,8 @@ from preprocessing import (
     default_prepare_datasets,
     validate_horizon_vs_granularity,
     filter_by_time_window,
+    encode_dataframe,
+    decode_dataframe,
 )
 
 BACKEND_URL = "http://localhost:8000/forecast"
@@ -29,12 +31,7 @@ TIMEOUT = 60  # HTTP timeout in seconds
 
 DATES = "./data/raw/shop_sales_dates.csv"
 
-_models = [
-    "XGBoost",
-    "LightGBM",
-    "Prophet",
-    "Etna",
-]
+_models = ["linear"]
 
 _metrics = [
     "MSE",
@@ -243,7 +240,7 @@ def main():
             "date_name": date_name,
             "segment_name": segment_name,
             "target_segment_names": segments,
-            "data": filtered_sales,
+            "data": encode_dataframe(sales_df),
             "horizon": horizon,
             "granularity": granularity,
             "model": model,
@@ -253,30 +250,30 @@ def main():
         # Send request to the backend (example backend port assumed to be 8000)
         # Update this with the correct backend URL
         # [TODO] - zeinovich - postprocessing of response
-        # response = requests.post(BACKEND_URL, json=payload, timeout=TIMEOUT)
-        response = np.random.normal(
-            filtered_sales["cnt"].mean(),
-            filtered_sales["cnt"].std(),
-            size=horizon // granularity,
-        )
-        response = pd.DataFrame(response, columns=["predicted"])
-        response["date"] = [
-            filtered_sales["date"].tolist()[-1] + timedelta(days=1) * (i + 1)
-            for i in range(horizon // granularity)
-        ]
-        response["upper"] = np.random.normal(
-            1.2 * response["predicted"],
-            0.5,
-            size=len(response),
-        )
-        response["lower"] = np.random.normal(
-            0.8 * response["predicted"],
-            0.5,
-            size=len(response),
-        )
-        response["lower"] = np.min(response[["lower", "upper"]].to_numpy(), axis=1)
-        response["upper"] = np.max(response[["lower", "upper"]].to_numpy(), axis=1)
-        st.session_state["response"] = response
+        response = requests.post(BACKEND_URL, json=payload, timeout=TIMEOUT)
+        # response = np.random.normal(
+        #     filtered_sales["cnt"].mean(),
+        #     filtered_sales["cnt"].std(),
+        #     size=horizon // granularity,
+        # )
+        # response = pd.DataFrame(response, columns=["predicted"])
+        # response["date"] = [
+        #     filtered_sales["date"].tolist()[-1] + timedelta(days=1) * (i + 1)
+        #     for i in range(horizon // granularity)
+        # ]
+        # response["upper"] = np.random.normal(
+        #     1.2 * response["predicted"],
+        #     0.5,
+        #     size=len(response),
+        # )
+        # response["lower"] = np.random.normal(
+        #     0.8 * response["predicted"],
+        #     0.5,
+        #     size=len(response),
+        # )
+        # response["lower"] = np.min(response[["lower", "upper"]].to_numpy(), axis=1)
+        # response["upper"] = np.max(response[["lower", "upper"]].to_numpy(), axis=1)
+        st.session_state["response"] = response.json()
 
     elif "response" in st.session_state:
         pass
@@ -285,12 +282,13 @@ def main():
         st.stop()
 
     # Process the response
-    # if response and response.status_code == 200:
-    if st.session_state["response"] is not None:
+    if response.status_code == 200:
+        # if st.session_state["response"] is not None:
         # [TODO] - zeinovich - postprocessing of response
         # append last history point to prediction
-        # forecast_data = pd.DataFrame(response.json())
-        forecast_data = st.session_state["response"]
+        forecast_data = decode_dataframe(response["encoded_predictions"])
+        forecast_metrics = decode_dataframe(response["encoded_metrics"])
+        # forecast_data = st.session_state["response"]
         # st.success("Forecast generated successfully!")
 
         table = st.expander("Forecast Table")
