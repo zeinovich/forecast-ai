@@ -10,14 +10,19 @@ Author: zeinovich
 
 from datetime import timedelta
 import requests  # dev
-from typing import List
 
 import streamlit as st
+from streamlit.delta_generator import DeltaGenerator
 
 import pandas as pd
 import numpy as np  # dev
 
 from plots import sku_plot, add_events, add_minmax, forecast_plot
+from preprocessing import (
+    default_prepare_datasets,
+    validate_horizon_vs_granularity,
+    filter_by_time_window,
+)
 
 BACKEND_URL = "http://localhost:8000/forecast"
 TIMEOUT = 60  # HTTP timeout in seconds
@@ -39,27 +44,16 @@ _metrics = [
 ]
 
 
-# Function to validate that the horizon is greater than the granularity
-def validate_horizon_vs_granularity(horizon, granularity):
-    """Checks if horizon >= granularity"""
-    horizons = {"1-day": 1, "1-week": 7, "1-month": 30}
-    granularities = {"1-day": 1, "1-week": 7, "1-month": 30}
-    h_int = horizons[horizon]
-    g_int = granularities[granularity]
-
-    return h_int >= g_int, h_int, g_int
-
-
 # [TODO] - zeinovich - make adaptive form for file download
-def upload_standard_data():
-    dates_file = st.sidebar.file_uploader("Upload dates CSV", type="csv")
-    sales_file = st.sidebar.file_uploader("Upload Sales CSV", type="csv")
-    prices_file = st.sidebar.file_uploader("Upload Prices CSV", type="csv")
+def upload_standard_data(expander: DeltaGenerator):
+    dates_file = expander.file_uploader("Upload dates CSV", type="csv")
+    sales_file = expander.file_uploader("Upload Sales CSV", type="csv")
+    prices_file = expander.file_uploader("Upload Prices CSV", type="csv")
 
     css = """
         <style>
             [data-testid='stFileUploader'] {
-                width: max-content;
+                width: max-container;
             }
             [data-testid='stFileUploader'] section {
                 padding: 0;
@@ -69,7 +63,7 @@ def upload_standard_data():
                 display: none;
             }
             [data-testid='stFileUploader'] section + div {
-                float: right;
+                float: left;
                 padding-top: 0;
             }
 
@@ -81,8 +75,8 @@ def upload_standard_data():
     return dates_file, sales_file, prices_file
 
 
-def upload_data():
-    sales_file = st.sidebar.file_uploader("Upload Sales CSV", type="csv")
+def upload_data(expander: DeltaGenerator):
+    sales_file = expander.file_uploader("Upload Sales CSV", type="csv")
 
     css = """
         <style>
@@ -109,98 +103,44 @@ def upload_data():
     return sales_file
 
 
-# [TODO] - zeinovich - move to preprocessing pipeline
-# [TODO] - zeinovich AutoML - how to pass DF to backend
-def default_merge(
-    dates: pd.DataFrame, sales: pd.DataFrame, prices: pd.DataFrame
-) -> pd.DataFrame:
-    """
-    Merges input dataframes. Works only for standard train format.
-    See README.md for dataframe structure (section "Data")
-
-    Args:
-        dates (pd.DataFrame): Dates dataframe
-        sales (pd.DataFrame): Sales dataframe
-        prices (pd.DataFrame): Prices dataframe
-
-    Returns:
-        pd.DataFrame: Merged dataframe
-    """
-
-    sales["SKU"] = sales["item_id"].apply(lambda x: x[-3:])
-    dates["date"] = pd.to_datetime(dates["date"])
-
-    sales_df = pd.merge(
-        left=sales,
-        right=dates[["date_id", "wm_yr_wk", "date"]],
-        how="left",
-        left_on="date_id",
-        right_on="date_id",
-        suffixes=("", ""),
-    )
-
-    # default_merge on (wm_yr_wk, item_id) to get price for particular week
-    sales_df = pd.merge(
-        left=sales_df,
-        right=prices[["item_id", "wm_yr_wk", "sell_price"]],
-        how="left",
-        left_on=("wm_yr_wk", "item_id"),
-        right_on=("wm_yr_wk", "item_id"),
-        suffixes=("", ""),
-    )
-
-    return sales_df
-
-
-# [TODO] - zeinovich - adapt for different datasets
-def default_prepare_datasets(dates_file, sales_file, prices_file):
-    dates = pd.read_csv(dates_file)
-    sales = pd.read_csv(sales_file)
-    prices = pd.read_csv(prices_file)
-
-    sales_df = default_merge(dates, sales, prices)
-
-    return sales_df, dates
-
-
 def reset_forecast():
     if "response" in st.session_state:
         del st.session_state["response"]
 
 
 def get_dataset_features(df: pd.DataFrame):
-    segment_name = st.sidebar.selectbox(
+    expander = st.sidebar.expander("DFU settings", expanded=True)
+    segment_name = expander.selectbox(
         "Select ID column", df.columns.tolist(), on_change=reset_forecast
     )
     unique_segments = df[segment_name].unique().tolist()
 
-    segments = st.sidebar.multiselect(
+    segments = expander.multiselect(
         f"Select {segment_name}", sorted(unique_segments), on_change=reset_forecast
     )
 
-    target_name = st.sidebar.selectbox(
+    target_name = expander.selectbox(
         "Select target column", df.columns.tolist(), on_change=reset_forecast
     )
-    date_name = st.sidebar.selectbox(
+    date_name = expander.selectbox(
         "Select date column", df.columns.tolist(), on_change=reset_forecast
     )
 
     return target_name, date_name, segment_name, segments
 
 
-def get_forecast_settings():
+def get_forecast_settings(forecast_expander):
     # Assuming SKU and Store columns exist in sales and prices
 
     # SKU and Store selection
     # [TODO] - zeinovich - multiSKU
-    st.sidebar.subheader("Forecast Settings")
-    horizon = st.sidebar.selectbox(
+    horizon = forecast_expander.selectbox(
         "Select Forecast Horizon",
         ["1-day", "1-week", "1-month"],
         on_change=reset_forecast,
     )
     # [TODO] - zeinovich - add aggregation of target
-    granularity = st.sidebar.selectbox(
+    granularity = forecast_expander.selectbox(
         "Select Granularity",
         ["1-day", "1-week", "1-month"],
         on_change=reset_forecast,
@@ -209,55 +149,24 @@ def get_forecast_settings():
     valid, h_int, g_int = validate_horizon_vs_granularity(horizon, granularity)
 
     if not valid:
-        st.sidebar.error("Forecast horizon must be greater than granularity.")
+        forecast_expander.error("Forecast horizon must be greater than granularity.")
         st.stop()
 
     # Model selection (this is a simple list of boosting algorithms for now)
 
-    model = st.sidebar.selectbox(
+    model = forecast_expander.selectbox(
         "Select Model",
         _models,
         on_change=reset_forecast,
     )
 
-    metric = st.sidebar.selectbox(
+    metric = forecast_expander.selectbox(
         "Select Metric",
         _metrics,
         on_change=reset_forecast,
     )
 
     return h_int, g_int, model, metric
-
-
-def filter_by_time_window(
-    df: pd.DataFrame, date_column: str, window: str
-) -> pd.DataFrame:
-    """
-    Filters dataframe by specified column and time window.
-    Goes back from tail of dataframe
-
-    Args:
-        df (pd.DataFrame): DataFrame
-        date_column (str): Date column name
-        window (str): Time window. Choice: ["1-week", "1-month", "3-month", "1-year", "All"]
-
-    Returns:
-        pd.DataFrame: Filtered dataframe
-    """
-    latest_date = df[date_column].max()
-
-    if window == "1-week":
-        start_date = latest_date - timedelta(weeks=1)
-    elif window == "1-month":
-        start_date = latest_date - timedelta(weeks=4)
-    elif window == "3-month":
-        start_date = latest_date - timedelta(weeks=12)
-    elif window == "1-year":
-        start_date = latest_date - timedelta(weeks=52)
-    else:
-        return df
-
-    return df[df[date_column] >= start_date]
 
 
 def process_forecast_table(df: pd.DataFrame, date_name: str):
@@ -274,12 +183,14 @@ def main():
     st.title("Demand Forecasting")
 
     # File upload section in the sidebar
-    st.sidebar.subheader("Upload data")
+    upload_expander = st.sidebar.expander("Upload data", expanded=True)
 
-    is_standard_format = st.sidebar.radio("Standard Format", ["Yes", "No"]) == "Yes"
+    is_standard_format = (
+        upload_expander.radio("Standard Format", ["Yes", "No"]) == "Yes"
+    )
 
     if is_standard_format:
-        dates_file, sales_file, prices_file = upload_standard_data()
+        dates_file, sales_file, prices_file = upload_standard_data(upload_expander)
 
         # Load the uploaded data
         if dates_file and sales_file and prices_file:
@@ -293,20 +204,21 @@ def main():
             st.stop()
 
     else:
-        sales_file = upload_data()
+        sales_file = upload_data(upload_expander)
 
         if sales_file:
             sales_df = pd.read_csv(sales_file)
             dates = pd.read_csv(DATES)
         else:
-            st.sidebar.warning("Please upload CSV file")
+            upload_expander.warning("Please upload CSV file")
             st.stop()
 
     # [TODO] - zeinovich - make adaptive form for target cols selection
     # [TODO] - zeinovich - place value if no store selection
     target_name, date_name, segment_name, segments = get_dataset_features(sales_df)
 
-    horizon, granularity, model, metric = get_forecast_settings()
+    forecast_expander = st.sidebar.expander("Forecast Settings", expanded=True)
+    horizon, granularity, model, metric = get_forecast_settings(forecast_expander)
 
     # Filter the data based on selected SKU and Store
     filtered_sales = sales_df.copy()
@@ -324,7 +236,7 @@ def main():
         filtered_sales = filtered_sales.sort_values(by=date_name)
 
     # Button to trigger the forecast request
-    if st.sidebar.button("Get Forecast"):
+    if forecast_expander.button("Get Forecast"):
         # Create payload with forecast settings
         payload = {
             "target_name": target_name,
@@ -394,7 +306,7 @@ def main():
     # # and preprocess it
     # Plotting the sales data
     # [TODO] - zeinovich - how to print out
-    plots_section = st.expander("Plots")
+    plots_section = st.expander("Plots", expanded=True)
     plots_section.subheader(f"Forecast for {', '.join(segments)}")
     cutoff = plots_section.selectbox(
         "Display history",
