@@ -1,19 +1,16 @@
 import importlib
 from etna.datasets import TSDataset
 from etna.metrics import SMAPE, MAE, MSE, MAPE
-from etna.models import (
-    AutoARIMAModel,
-    ProphetModel,
-    SARIMAXModel,
-    CatBoostMultiSegmentModel,
-    LinearPerSegmentModel,
-    ElasticMultiSegmentModel,
-    HoltModel,
-    SeasonalMovingAverageModel
-)
 from etna.pipeline import Pipeline
-from etna.transforms import ModelOutliersTransform, DateFlagsTransform, LagTransform, MovingAverageTransform, FourierTransform
-import numpy as np
+from etna.transforms import (
+    DensityOutliersTransform,
+    DateFlagsTransform,
+    LagTransform,
+    RobustScalerTransform,
+    FourierTransform,
+    BoxCoxTransform,
+    SegmentEncoderTransform
+)
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 
@@ -49,8 +46,7 @@ def preprocess_data(df: pd.DataFrame, target_name: str, date_name: str, segment_
     return df
 
 def remove_outliners(df: TSDataset):
-    prophet_model = ProphetModel()
-    outliers_transform = ModelOutliersTransform(model=prophet_model, in_column='target', threshold=3)
+    outliers_transform = DensityOutliersTransform(in_column='target')
     df.fit_transform([outliers_transform])
     return df
 
@@ -73,13 +69,17 @@ def generate_features_etna(df: TSDataset):
     date_flags_transform = DateFlagsTransform()
 
     lag_transform = LagTransform(in_column="target", lags=[7, 14, 30])
-    ma_transform = MovingAverageTransform(in_column="target", window=7)
     fourier_transform = FourierTransform(period=365.25, order=3)
+    scaler_transform = RobustScalerTransform(in_column="target")
+    boxcox_transform = BoxCoxTransform(in_column="target")
+    segment_encoder = SegmentEncoderTransform()
     df.fit_transform([
         date_flags_transform,
         lag_transform,
-        ma_transform,
-        fourier_transform
+        fourier_transform,
+        scaler_transform,
+        boxcox_transform,
+        segment_encoder
     ])
     return df
 
