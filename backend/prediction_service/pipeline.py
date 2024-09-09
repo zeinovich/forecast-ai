@@ -1,3 +1,4 @@
+import importlib
 from etna.datasets import TSDataset
 from etna.metrics import SMAPE, MAE, MSE, MAPE
 from etna.models import (
@@ -106,7 +107,22 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     # ...
     return transformed_df
 
-def predict_with_model(df: TSDataset, target_segment_names: list[str], horizon: int, model: str, metric: bool):
+def import_model_class(model_name: str):
+    """
+    Импортирует модель по её названию. Если модель из нейросетевого модуля (nn), она импортируется из etna.models.nn.
+    """
+    if model_name.startswith('nn.'):
+        module_path = f"etna.models.nn.{model_name}"
+    else:
+        module_path = f"etna.models.{model_name}"
+
+    module_name, class_name = module_path.rsplit(".", 1)
+
+    module = importlib.import_module(module_name)
+    model_class = getattr(module, class_name)
+    return model_class
+
+def predict_with_model(df: TSDataset, target_segment_names: list[str], horizon: int, model_name: str, metric: bool):
     """
     Интерфейс предсказания через выбранную модель.
     Модели подключаются отдельно.
@@ -118,25 +134,8 @@ def predict_with_model(df: TSDataset, target_segment_names: list[str], horizon: 
     :param metric: необходимо ли возвращать значения метрик
     :return: предсказанные значения
     """
-    match model:
-        case "auto_arima":
-            model_instance = AutoARIMAModel()
-        case "prophet":
-            model_instance = ProphetModel()
-        case "sarimax":
-            model_instance = SARIMAXModel()
-        case "catboost":
-            model_instance = CatBoostMultiSegmentModel()
-        case "linear":
-            model_instance = LinearPerSegmentModel()
-        case "elastic_net":
-            model_instance = ElasticMultiSegmentModel()
-        case "holt":
-            model_instance = HoltModel()
-        case "seasonal_moving_average":
-            model_instance = SeasonalMovingAverageModel()
-        case _:
-            raise NotImplementedError(f"Model {model} is not implemented yet.")
+    model_class = import_model_class(model_name)
+    model_instance = model_class()
         
     pipeline = Pipeline(model=model_instance, horizon=horizon)
     pipeline.fit(df)
@@ -145,6 +144,6 @@ def predict_with_model(df: TSDataset, target_segment_names: list[str], horizon: 
     forecast_df = forecast_ts.df.loc[:, pd.IndexSlice[:, ['target', 'target_0.025', 'target_0.975']]]
 
     if metric:
-        metrics_df, _, _ = pipeline.backtest(ts=ts, metrics=[MAE(), MSE(), MAPE(), SMAPE()], n_folds=3, aggregate_metrics=True)
+        metrics_df, _, _ = pipeline.backtest(ts=df, metrics=[MAE(), MSE(), MAPE(), SMAPE()], n_folds=3, aggregate_metrics=True)
 
     return forecast_df, metrics_df
