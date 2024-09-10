@@ -2,7 +2,7 @@ from fastapi import FastAPI
 import pandas as pd
 import base64
 from io import BytesIO
-from .pipeline import preprocess_data, predict_with_model
+from pipeline import preprocess_data, predict_with_model
 
 app = FastAPI()
 
