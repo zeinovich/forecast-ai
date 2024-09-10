@@ -194,7 +194,9 @@ def predict_with_model(
         is_weekend=True, day_number_in_month=True, day_number_in_week=True
     )
 
-    lag_transform = LagTransform(in_column="target", lags=[7, 14, 30])
+    lag_transform = LagTransform(
+        in_column="target", lags=list(range(horizon, 2 * horizon + 1, 1))
+    )
     fourier_transform = FourierTransform(period=365.25, order=3)
     scaler_transform = RobustScalerTransform(in_column="target")
     segment_encoder = SegmentEncoderTransform()
@@ -225,6 +227,7 @@ def predict_with_model(
     future = df.make_future(future_steps=horizon, transforms=transforms)
 
     forecast_ts = model.forecast(ts=future, prediction_interval=True)
+    forecast_ts.inverse_transform(transforms)
     forecast_df = forecast_ts.df.loc[
         :, pd.IndexSlice[:, ["target", "target_0.025", "target_0.975"]]
     ]
