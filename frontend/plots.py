@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, List
 from datetime import timedelta
 
 import pandas as pd
@@ -13,7 +13,9 @@ _pallette = [
 ]
 
 
-def sku_plot(df: pd.DataFrame, x: str, y: str, title: str) -> go.Figure:
+def sku_plot(
+    df: pd.DataFrame, x: str, y: str, segment_name: str, segments: List[str]
+) -> go.Figure:
     """
     Plots line plot from data. Data distribution is appended to the left of a line plot
 
@@ -32,14 +34,17 @@ def sku_plot(df: pd.DataFrame, x: str, y: str, title: str) -> go.Figure:
     # Right subplot - histogram of values in y column (20% width)
     plot = go.Figure()
 
-    plot.add_trace(
-        go.Scatter(
-            x=df[x],
-            y=df[y],
-            mode="lines",
-            showlegend=False,
+    for segment in segments:
+        df_ = df[df[segment_name] == segment]
+        plot.add_trace(
+            go.Scatter(
+                x=df_[x],
+                y=df_[y],
+                mode="lines",
+                name=segment,
+                showlegend=False,
+            )
         )
-    )
 
     return plot
 
@@ -125,6 +130,7 @@ def add_events(event_dates: pd.DataFrame, plot: go.Figure) -> go.Figure:
 
 def forecast_plot(
     forecast_data: pd.DataFrame,
+    segment: str,
     fig: go.Figure = None,
     scatter_args: Dict[str, Any] = None,
 ) -> go.Figure:
@@ -145,16 +151,13 @@ def forecast_plot(
     if not fig:
         fig = go.Figure()
 
-    print("plotting forecast")
-    print(len(forecast_data))
-
     fig.add_trace(
         go.Scatter(
             x=forecast_data["date"],
             y=forecast_data["predicted"],
             mode="lines",
-            name="Prediction",
-            showlegend=False,
+            name=f"Prediction ({segment})",
+            showlegend=True,
             **scatter_args,
         )
     )
@@ -166,7 +169,7 @@ def forecast_plot(
             y=forecast_data["upper"],
             mode="lines",
             line=dict(width=0),
-            name="Upper Bound",
+            name=f"Upper Bound ({segment})",
             showlegend=False,
         )
     )
@@ -179,7 +182,7 @@ def forecast_plot(
             line=dict(width=0),
             fill="tonexty",
             fillcolor="rgba(68, 68, 68, 0.3)",
-            name="Lower Bound",
+            name=f"Lower Bound ({segment})",
             showlegend=False,
         )
     )

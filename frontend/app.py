@@ -26,6 +26,14 @@ from preprocessing import (
     decode_dataframe,
 )
 
+_pallette = [
+    "#5ba300",
+    "#89ce00",
+    "#0073e6",
+    "#e6308a",
+    "#b51963",
+]
+
 BACKEND_URL = "http://localhost:8000/forecast"
 TIMEOUT = 300  # HTTP timeout in seconds
 
@@ -309,43 +317,66 @@ def main():
         sales_for_display = filter_by_time_window(filtered_sales, date_name, cutoff)
         dates_for_display = filter_by_time_window(dates, date_name, cutoff)
 
+        sales_for_display = sales_for_display[[date_name, segment_name, target_name]]
+        sales_for_display["upper"] = sales_for_display[target_name]
+        sales_for_display["lower"] = sales_for_display[target_name]
+        sales_for_display = sales_for_display.rename(
+            {
+                target_name: "predicted",
+                date_name: "date",
+            },
+            axis=1,
+        )
+
         event_dates = dates_for_display[dates_for_display["event_type_1"].notna()][
             ["date", "event_name_1", "event_type_1"]
         ]
         # [TODO] - multiSKU
-        sales_plot = sku_plot(
-            sales_for_display,
-            x=date_name,
-            y=target_name,
-            title="Sales over Time",
-        )
+        # sales_plot = sku_plot(
+        #     sales_for_display,
+        #     x=date_name,
+        #     y=target_name,
+        #     segments=segments,
+        #     segment_name=segment_name,
+        # )
+        sales_plot = None
+
+        for segment, c in zip(segments, _pallette):
+            seg_hist = sales_for_display[sales_for_display[segment_name] == segment]
+
+            sales_plot = (
+                forecast_plot(
+                    seg_hist,
+                    segment,
+                    sales_plot,
+                    scatter_args={"line": {"color": c}},
+                )
+                if len(seg_hist) > 0
+                else sales_plot
+            )
+
         sales_plot = add_events(event_dates, sales_plot)
-        forecast_data.loc[len(forecast_data)] = pd.Series(
-            [
-                filtered_sales[date_name].iloc[-1],
-                filtered_sales[target_name].iloc[-1],
-                filtered_sales[target_name].iloc[-1],
-                filtered_sales[target_name].iloc[-1],
-            ],
-            index=["date", "predicted", "upper", "lower"],
-        )
 
         forecast_data = forecast_data.sort_values("date")
+        sales_for_display = sales_for_display.sort_values(by="date")
 
         min_y, max_y = (
-            sales_for_display[target_name].min(),
-            sales_for_display[target_name].max(),
+            sales_for_display["predicted"].min(),
+            sales_for_display["predicted"].max(),
         )
 
         min_x, max_x = (sales_for_display[date_name].min(), forecast_data["date"].max())
 
         sales_plot = add_minmax(sales_plot, min_y, max_y, min_x, max_x)
 
-    sales_plot = forecast_plot(
-        forecast_data,
-        sales_plot,
-        scatter_args={"line": {"color": "Green", "dash": "dash"}},
-    )
+    for segment, c in zip(segments, _pallette):
+        forecast_seg = forecast_data[forecast_data["segment"] == segment]
+        sales_plot = forecast_plot(
+            forecast_seg,
+            segment,
+            sales_plot,
+            scatter_args={"line": {"color": c, "dash": "dash"}},
+        )
 
     sales_st.plotly_chart(sales_plot)
 
