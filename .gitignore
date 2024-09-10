@@ -12,3 +12,6 @@ venv/
 
 # Poetry
 poetry.lock
+
+# catboost logs
+catboost_info/
