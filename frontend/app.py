@@ -250,31 +250,8 @@ def main():
 
         # Send request to the backend (example backend port assumed to be 8000)
         # Update this with the correct backend URL
-        # [TODO] - zeinovich - postprocessing of response
         response = requests.post(BACKEND_URL, json=payload, timeout=TIMEOUT)
-        # response = np.random.normal(
-        #     filtered_sales["cnt"].mean(),
-        #     filtered_sales["cnt"].std(),
-        #     size=horizon // granularity,
-        # )
-        # response = pd.DataFrame(response, columns=["predicted"])
-        # response["date"] = [
-        #     filtered_sales["date"].tolist()[-1] + timedelta(days=1) * (i + 1)
-        #     for i in range(horizon // granularity)
-        # ]
-        # response["upper"] = np.random.normal(
-        #     1.2 * response["predicted"],
-        #     0.5,
-        #     size=len(response),
-        # )
-        # response["lower"] = np.random.normal(
-        #     0.8 * response["predicted"],
-        #     0.5,
-        #     size=len(response),
-        # )
-        # response["lower"] = np.min(response[["lower", "upper"]].to_numpy(), axis=1)
-        # response["upper"] = np.max(response[["lower", "upper"]].to_numpy(), axis=1)
-        st.session_state["response"] = response.json()
+        st.session_state["response"] = response
 
     elif "response" in st.session_state:
         pass
@@ -283,15 +260,27 @@ def main():
         st.stop()
 
     # Process the response
-    if response.status_code == 200:
+    if (
+        "response" in st.session_state
+        and st.session_state["response"].status_code == 200
+    ):
         # if st.session_state["response"] is not None:
         # [TODO] - zeinovich - postprocessing of response
         # append last history point to prediction
+        response = st.session_state["response"].json()
         forecast_data = decode_dataframe(response["encoded_predictions"])
-        forecast_metrics = decode_dataframe(response["encoded_metrics"])
+        forecast_data = forecast_data.rename(
+            {
+                "timestamp": "date",
+                "target": "predicted",
+                "target_0.025": "lower",
+                "target_0.975": "upper",
+            },
+            axis=1,
+        )
+        # forecast_metrics = decode_dataframe(response["encoded_metrics"])
         # forecast_data = st.session_state["response"]
         # st.success("Forecast generated successfully!")
-
         table = st.expander("Forecast Table")
         # Display the forecast data
         forecast_data_for_display = process_forecast_table(forecast_data, date_name)
