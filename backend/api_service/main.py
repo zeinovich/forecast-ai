@@ -26,6 +26,8 @@ async def get_forecast(payload: dict):
     metric = payload["metric"]
     top_k_features = payload["top_k_features"]
 
+    print(target_segment_names)
+
     prediction_url = (
         f"http://{PREDICTION_SERVICE_HOST}:{PREDICTION_SERVICE_PORT}/predict/"
     )

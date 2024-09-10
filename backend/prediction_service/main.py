@@ -2,7 +2,7 @@ from fastapi import FastAPI
 import pandas as pd
 import base64
 from io import BytesIO
-from pipeline import preprocess_data, predict_with_model
+from .pipeline import preprocess_data, predict_with_model
 
 app = FastAPI()
 
@@ -24,13 +24,15 @@ async def predict(payload: dict):
     metric = payload["metric"]
     top_k_features = payload["top_k_features"]
 
+    print(target_segment_names)
+
     decoded_data = base64.b64decode(data)
     df = pd.read_csv(BytesIO(decoded_data))
 
     df = preprocess_data(df, target_name, date_name, segment_name, granularity)
 
     print(type(df))
-    prediction_df, metrics_df = predict_with_model(
+    prediction_df = predict_with_model(
         df,
         target_segment_names,
         horizon,
@@ -44,7 +46,6 @@ async def predict(payload: dict):
     encoded_predictions = base64.b64encode(buffer_pred.getvalue()).decode("utf-8")
 
     buffer_metrics = BytesIO()
-    metrics_df.to_csv(buffer_metrics, index=False)
     encoded_metrics = base64.b64encode(buffer_metrics.getvalue()).decode("utf-8")
 
     return {

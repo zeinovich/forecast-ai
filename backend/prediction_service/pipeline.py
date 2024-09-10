@@ -1,4 +1,5 @@
 import importlib
+from etna.auto import Auto
 from etna.datasets import TSDataset
 from etna.metrics import SMAPE, MAE, MSE, MAPE
 from etna.pipeline import Pipeline
@@ -67,13 +68,14 @@ def preprocess_data(
     elif granularity == "monthly":
         ts_dataset = ts_dataset.to_period("M")
 
-    ts_dataset = remove_outliners(ts_dataset)
     ts_dataset = generate_features_etna(ts_dataset)
+    #ts_dataset = remove_outliners(ts_dataset)
 
-    ts_dataset.df = ts_dataset.df.applymap(
-        lambda x: 1 if x is True else (0 if x is False else x)
-    )
-    ts_dataset.df = ts_dataset.df.fillna(0)
+    #ts_dataset.df = ts_dataset.df.applymap(
+    #    lambda x: 1 if x is True else (0 if x is False else x)
+    #)
+    #ts_dataset.df = ts_dataset.df.fillna(0)
+
     return ts_dataset
 
 
@@ -99,18 +101,18 @@ def generate_features_etna(df: TSDataset) -> TSDataset:
     Возвращает:
     TSDataset - временной ряд с добавленными признаками.
     """
-    date_flags_transform = DateFlagsTransform()
+    # date_flags_transform = DateFlagsTransform(is_weekend=False, day_number_in_month = False, day_number_in_week=False)
 
-    lag_transform = LagTransform(in_column="target", lags=[7, 14, 30])
-    fourier_transform = FourierTransform(period=365.25, order=3)
-    scaler_transform = RobustScalerTransform(in_column="target")
+    # lag_transform = LagTransform(in_column="target", lags=[7, 14, 30])
+    #fourier_transform = FourierTransform(period=365.25, order=3)
+    #scaler_transform = RobustScalerTransform(in_column="target")
     segment_encoder = SegmentEncoderTransform()
     df.fit_transform(
         [
-            date_flags_transform,
-            lag_transform,
-            fourier_transform,
-            scaler_transform,
+            #date_flags_transform,
+            #lag_transform,
+            #fourier_transform,
+            #scaler_transform,
             segment_encoder,
         ]
     )
@@ -189,30 +191,31 @@ def predict_with_model(
     :param metric: необходимо ли возвращать значения метрик
     :return: предсказанные значения
     """
-    model_class = import_model_class(model_name)
-    model_instance = model_class()
 
     transform = TreeFeatureSelectionTransform(
         model="catboost",
         top_k=top_k_features,
     )
+    df.fit_transform([transform])
 
-    pipeline = Pipeline(
-        model=model_instance,
-        transforms=[transform],
-        horizon=horizon,
-    )
+    if model_name == '' or not model_name:
+        auto = Auto(target_metric=SMAPE(), horizon=horizon, backtest_params=dict(n_folds=5))
+        pipeline = auto.fit(ts=df, tune_size=0)
+    else:
+        model_class = import_model_class(model_name)
+        model_instance = model_class()    
+        pipeline = Pipeline(model=model_instance, horizon=horizon)
+    
     pipeline.fit(df)
 
-    target_segments = df[:, target_segment_names, :]
-    target_ts = TSDataset(target_segments, freq=df.freq)
-
-    forecast_ts = pipeline.forecast(ts=target_ts, prediction_interval=True)
+    #df.df = df[:, target_segment_names, :]
+    
+    forecast_ts = pipeline.forecast(ts=df, prediction_interval=True)
     forecast_df = forecast_ts.df.loc[
         :, pd.IndexSlice[:, ["target", "target_0.025", "target_0.975"]]
     ]
 
-    if metric:
+    if not metric:
         metrics_df, _, _ = pipeline.backtest(
             ts=df,
             metrics=[MAE(), MSE(), MAPE(), SMAPE()],
@@ -220,4 +223,4 @@ def predict_with_model(
             aggregate_metrics=True,
         )
 
-    return forecast_df, metrics_df
+    return forecast_df
