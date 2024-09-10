@@ -1,6 +1,6 @@
 from datetime import timedelta
 from typing import Dict, Any
-from io import BytesIO
+import pickle
 import base64
 
 import pandas as pd
@@ -87,13 +87,11 @@ def filter_by_time_window(
 
 
 def encode_dataframe(df: pd.DataFrame) -> Dict[Any, Any]:
-    buffer_pred = BytesIO()
-    df.to_csv(buffer_pred, index=False)
-    encoded = base64.b64encode(buffer_pred.getvalue()).decode("utf-8")
-    return encoded
+    pickled = pickle.dumps(df)
+    pickled_b64 = base64.b64encode(pickled)
+    hug_pickled_str = pickled_b64.decode("utf-8")
+    return hug_pickled_str
 
 
-def decode_dataframe(data):
-    decoded_data = base64.b64decode(data)
-    df = pd.read_csv(BytesIO(decoded_data))
-    return df
+def decode_dataframe(data) -> pd.DataFrame:
+    return pickle.loads(base64.b64decode(data.encode()))

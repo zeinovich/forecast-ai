@@ -31,18 +31,18 @@ def preprocess_data(
     df[date_name] = pd.to_datetime(df[date_name])
     label_encoder = LabelEncoder()
 
-    df["event_name_1_encoded"] = label_encoder.fit_transform(
-        df["event_name_1"].fillna("0")
-    )
-    df["event_type_1_encoded"] = label_encoder.fit_transform(
-        df["event_type_1"].fillna("0")
-    )
-    df["event_name_2_encoded"] = label_encoder.fit_transform(
-        df["event_name_2"].fillna("0")
-    )
-    df["event_type_2_encoded"] = label_encoder.fit_transform(
-        df["event_type_2"].fillna("0")
-    )
+    # df["event_name_1_encoded"] = label_encoder.fit_transform(
+    #     df["event_name_1"].fillna("0")
+    # )
+    # df["event_type_1_encoded"] = label_encoder.fit_transform(
+    #     df["event_type_1"].fillna("0")
+    # )
+    # df["event_name_2_encoded"] = label_encoder.fit_transform(
+    #     df["event_name_2"].fillna("0")
+    # )
+    # df["event_type_2_encoded"] = label_encoder.fit_transform(
+    #     df["event_type_2"].fillna("0")
+    # )
     df.drop(
         columns=[
             "event_name_1",
@@ -50,6 +50,12 @@ def preprocess_data(
             "event_name_2",
             "event_type_2",
             "store_id",
+            "CASHBACK_STORE_1",
+            "CASHBACK_STORE_2",
+            "CASHBACK_STORE_3",
+            "date_id",
+            "wm_yr_wk",
+            "sell_price",
         ],
         inplace=True,
     )
@@ -61,12 +67,13 @@ def preprocess_data(
     df.drop(columns=[date_name, segment_name, target_name], inplace=True)
 
     df = generate_features(df)
-    ts_dataset = TSDataset(df, freq="D")
 
-    if granularity == "weekly":
-        ts_dataset = ts_dataset.to_period("W")
-    elif granularity == "monthly":
-        ts_dataset = ts_dataset.to_period("M")
+    if granularity == 1:
+        ts_dataset = TSDataset(df, freq="D")
+    elif granularity == 7:
+        ts_dataset = TSDataset(df, freq="W")
+    elif granularity == 30:
+        ts_dataset = TSDataset(df, freq="M")
 
     # ts_dataset = generate_features_etna(ts_dataset)
     # ts_dataset = remove_outliners(ts_dataset)
@@ -85,38 +92,25 @@ def remove_outliners(df: TSDataset):
     return df
 
 
-def generate_features_etna(df: TSDataset) -> TSDataset:
-    """
-    Генерация стандартных признаков для временных рядов с использованием Etna.
+# def generate_features_etna(df: TSDataset) -> TSDataset:
+#     """
+#     Генерация стандартных признаков для временных рядов с использованием Etna.
 
-    Признаки включают:
-    - Признаки на основе даты (год, месяц, день недели и т.д.)
-    - Лаги целевой переменной
-    - Скользящее среднее
-    - Гармоники Фурье для моделирования сезонности
+#     Признаки включают:
+#     - Признаки на основе даты (год, месяц, день недели и т.д.)
+#     - Лаги целевой переменной
+#     - Скользящее среднее
+#     - Гармоники Фурье для моделирования сезонности
 
-    Параметры:
-    ts_dataset: TSDataset - исходные данные временных рядов.
+#     Параметры:
+#     ts_dataset: TSDataset - исходные данные временных рядов.
 
-    Возвращает:
-    TSDataset - временной ряд с добавленными признаками.
-    """
-    # date_flags_transform = DateFlagsTransform(is_weekend=False, day_number_in_month = False, day_number_in_week=False)
+#     Возвращает:
+#     TSDataset - временной ряд с добавленными признаками.
+#     """
 
-    # lag_transform = LagTransform(in_column="target", lags=[7, 14, 30])
-    # fourier_transform = FourierTransform(period=365.25, order=3)
-    # scaler_transform = RobustScalerTransform(in_column="target")
-    segment_encoder = SegmentEncoderTransform()
-    df.fit_transform(
-        [
-            # date_flags_transform,
-            # lag_transform,
-            # fourier_transform,
-            # scaler_transform,
-            segment_encoder,
-        ]
-    )
-    return df
+#     df.fit_transform([])
+#     return df
 
 
 def generate_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -125,21 +119,21 @@ def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     """
 
     transformed_df = df.copy()
-    print(transformed_df.columns)
-    transformed_df["is_event_day"] = (
-        transformed_df[["event_type_1_encoded", "event_type_2_encoded"]]
-        .notna()
-        .any(axis=1)
-    )
-    transformed_df["is_double_event"] = (
-        transformed_df[["event_type_1_encoded", "event_type_2_encoded"]]
-        .notna()
-        .all(axis=1)
-    )
-    transformed_df["is_start_of_month"] = transformed_df["timestamp"].dt.day <= 5
-    transformed_df["is_end_of_month"] = transformed_df["timestamp"].dt.day >= (
-        transformed_df["timestamp"].dt.days_in_month - 4
-    )
+
+    # transformed_df["is_event_day"] = (
+    #     transformed_df[["event_type_1_encoded", "event_type_2_encoded"]]
+    #     .notna()
+    #     .any(axis=1)
+    # )
+    # transformed_df["is_double_event"] = (
+    #     transformed_df[["event_type_1_encoded", "event_type_2_encoded"]]
+    #     .notna()
+    #     .all(axis=1)
+    # )
+    # transformed_df["is_start_of_month"] = transformed_df["timestamp"].dt.day <= 5
+    # transformed_df["is_end_of_month"] = transformed_df["timestamp"].dt.day >= (
+    #     transformed_df["timestamp"].dt.days_in_month - 4
+    # )
     # transformed_df['average_sales_per_weekday']
     # transformed_df['average_sales_per_month']
     # transformed_df['has_cashback']
@@ -192,11 +186,29 @@ def predict_with_model(
     :return: предсказанные значения
     """
 
-    transform = TreeFeatureSelectionTransform(
+    tfs_transform = TreeFeatureSelectionTransform(
         model="catboost",
         top_k=top_k_features,
     )
-    df.fit_transform([transform])
+    date_flags_transform = DateFlagsTransform(
+        is_weekend=True, day_number_in_month=True, day_number_in_week=True
+    )
+
+    lag_transform = LagTransform(in_column="target", lags=[7, 14, 30])
+    fourier_transform = FourierTransform(period=365.25, order=3)
+    scaler_transform = RobustScalerTransform(in_column="target")
+    segment_encoder = SegmentEncoderTransform()
+
+    transforms = [
+        date_flags_transform,
+        lag_transform,
+        fourier_transform,
+        scaler_transform,
+        segment_encoder,
+        tfs_transform,
+    ]
+
+    df.fit_transform(transforms)
 
     if model_name == "" or not model_name:
         auto = Auto(
@@ -205,24 +217,34 @@ def predict_with_model(
         pipeline = auto.fit(ts=df, tune_size=0)
     else:
         model_class = import_model_class(model_name)
-        model_instance = model_class()
-        pipeline = Pipeline(model=model_instance, horizon=horizon)
+        model = model_class()
 
-    pipeline.fit(df)
+    model.fit(df)
 
-    # df.df = df[:, target_segment_names, :]
+    df.df = df[:, target_segment_names, :]
+    future = df.make_future(future_steps=horizon, transforms=transforms)
 
-    forecast_ts = pipeline.forecast(ts=df, prediction_interval=True)
+    forecast_ts = model.forecast(ts=future, prediction_interval=True)
     forecast_df = forecast_ts.df.loc[
         :, pd.IndexSlice[:, ["target", "target_0.025", "target_0.975"]]
     ]
 
-    if not metric:
-        metrics_df, _, _ = pipeline.backtest(
-            ts=df,
-            metrics=[MAE(), MSE(), MAPE(), SMAPE()],
-            n_folds=3,
-            aggregate_metrics=True,
-        )
+    # forecast_df = forecast_df.reset_index()
+    forecast_df = pd.melt(forecast_df, ignore_index=False).reset_index()
+    forecast_df = forecast_df.pivot(
+        index=["segment", "timestamp"], columns="feature", values="value"
+    ).reset_index()
+
+    forecast_df = forecast_df[
+        ["timestamp", "segment", "target", "target_0.025", "target_0.975"]
+    ]
+
+    # if metric:
+    #     metrics_df, _, _ = pipeline.backtest(
+    #         ts=df,
+    #         metrics=[MAE(), MSE(), MAPE(), SMAPE()],
+    #         n_folds=3,
+    #         aggregate_metrics=True,
+    #     )
 
     return forecast_df
