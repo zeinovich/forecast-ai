@@ -1,10 +1,19 @@
 from fastapi import FastAPI
 import pandas as pd
 import base64
-from io import BytesIO
+
+# from io import BytesIO
+import pickle
 from pipeline import preprocess_data, predict_with_model
 
 app = FastAPI()
+
+
+def encode_dataframe(df: pd.DataFrame):
+    pickled = pickle.dumps(df)
+    pickled_b64 = base64.b64encode(pickled)
+    hug_pickled_str = pickled_b64.decode("utf-8")
+    return hug_pickled_str
 
 
 @app.post("/predict/")
@@ -26,29 +35,31 @@ async def predict(payload: dict):
 
     print(target_segment_names)
 
-    decoded_data = base64.b64decode(data)
-    df = pd.read_csv(BytesIO(decoded_data))
+    # decoded_data = base64.b64decode(data)
+    # df = pd.read_csv(BytesIO(decoded_data))
+
+    df = pickle.loads(base64.b64decode(data.encode()))
 
     df = preprocess_data(df, target_name, date_name, segment_name, granularity)
-
-    print(type(df))
     prediction_df = predict_with_model(
         df,
         target_segment_names,
-        horizon,
+        horizon // granularity,
         model_name,
         metric,
         top_k_features=top_k_features,
     )
 
-    buffer_pred = BytesIO()
-    prediction_df.to_csv(buffer_pred, index=False)
-    encoded_predictions = base64.b64encode(buffer_pred.getvalue()).decode("utf-8")
+    # buffer_pred = BytesIO()
+    # prediction_df.to_csv(buffer_pred, index=False)
+    # encoded_predictions = base64.b64encode(buffer_pred.getvalue()).decode("utf-8")
 
-    buffer_metrics = BytesIO()
-    encoded_metrics = base64.b64encode(buffer_metrics.getvalue()).decode("utf-8")
+    # buffer_metrics = BytesIO()
+    # encoded_metrics = base64.b64encode(buffer_metrics.getvalue()).decode("utf-8")
+    encoded_predictions = encode_dataframe(prediction_df)
+    # encoded_metrics = encode_dataframe(metrics_df)
 
     return {
         "encoded_predictions": encoded_predictions,
-        "encoded_metrics": encoded_metrics,
+        "encoded_metrics": 0,
     }
