@@ -68,13 +68,13 @@ def preprocess_data(
     elif granularity == "monthly":
         ts_dataset = ts_dataset.to_period("M")
 
-    ts_dataset = generate_features_etna(ts_dataset)
-    #ts_dataset = remove_outliners(ts_dataset)
+    # ts_dataset = generate_features_etna(ts_dataset)
+    # ts_dataset = remove_outliners(ts_dataset)
 
-    #ts_dataset.df = ts_dataset.df.applymap(
+    # ts_dataset.df = ts_dataset.df.applymap(
     #    lambda x: 1 if x is True else (0 if x is False else x)
-    #)
-    #ts_dataset.df = ts_dataset.df.fillna(0)
+    # )
+    # ts_dataset.df = ts_dataset.df.fillna(0)
 
     return ts_dataset
 
@@ -104,15 +104,15 @@ def generate_features_etna(df: TSDataset) -> TSDataset:
     # date_flags_transform = DateFlagsTransform(is_weekend=False, day_number_in_month = False, day_number_in_week=False)
 
     # lag_transform = LagTransform(in_column="target", lags=[7, 14, 30])
-    #fourier_transform = FourierTransform(period=365.25, order=3)
-    #scaler_transform = RobustScalerTransform(in_column="target")
+    # fourier_transform = FourierTransform(period=365.25, order=3)
+    # scaler_transform = RobustScalerTransform(in_column="target")
     segment_encoder = SegmentEncoderTransform()
     df.fit_transform(
         [
-            #date_flags_transform,
-            #lag_transform,
-            #fourier_transform,
-            #scaler_transform,
+            # date_flags_transform,
+            # lag_transform,
+            # fourier_transform,
+            # scaler_transform,
             segment_encoder,
         ]
     )
@@ -198,18 +198,20 @@ def predict_with_model(
     )
     df.fit_transform([transform])
 
-    if model_name == '' or not model_name:
-        auto = Auto(target_metric=SMAPE(), horizon=horizon, backtest_params=dict(n_folds=5))
+    if model_name == "" or not model_name:
+        auto = Auto(
+            target_metric=SMAPE(), horizon=horizon, backtest_params=dict(n_folds=5)
+        )
         pipeline = auto.fit(ts=df, tune_size=0)
     else:
         model_class = import_model_class(model_name)
-        model_instance = model_class()    
+        model_instance = model_class()
         pipeline = Pipeline(model=model_instance, horizon=horizon)
-    
+
     pipeline.fit(df)
 
-    #df.df = df[:, target_segment_names, :]
-    
+    # df.df = df[:, target_segment_names, :]
+
     forecast_ts = pipeline.forecast(ts=df, prediction_interval=True)
     forecast_df = forecast_ts.df.loc[
         :, pd.IndexSlice[:, ["target", "target_0.025", "target_0.975"]]
