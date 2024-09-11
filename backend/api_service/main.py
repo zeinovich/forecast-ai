@@ -8,6 +8,8 @@ CLUSTERING_SERVICE_HOST = "cluster"
 PREDICTION_SERVICE_PORT = 8001
 CLUSTERING_SERVICE_PORT = 8002
 
+TIMEOUT = 300
+
 
 @app.post("/forecast/")
 async def get_forecast(payload: dict):
@@ -45,6 +47,7 @@ async def get_forecast(payload: dict):
             "metric": metric,
             "top_k_features": top_k_features,
         },
+        timeout=TIMEOUT,
     )
 
     return response.json()
@@ -66,6 +69,7 @@ async def get_clusters_dataset(payload: dict):
         json={
             "data": data,
         },
+        timeout=TIMEOUT,
     )
 
     return response.json()
