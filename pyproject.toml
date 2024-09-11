@@ -5,6 +5,7 @@ description = "Automated system for demand forecasting"
 authors = ["Nikita.Zinovich <nikita.zinovich@gmail.com>"]
 license = "MIT License"
 readme = "README.md"
+package-mode = false
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.11.0"
