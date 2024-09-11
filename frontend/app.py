@@ -8,17 +8,15 @@ To start app run: `streamlit run ./frontend/app.py`
 Author: zeinovich
 """
 
-from datetime import timedelta
-import requests  # dev
+import requests
 
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 
 import pandas as pd
-import numpy as np  # dev
 
-from plots import sku_plot, add_events, add_minmax, forecast_plot
-from preprocessing import (
+from src.plots import sku_plot, add_events, add_minmax, forecast_plot
+from src.preprocessing import (
     default_prepare_datasets,
     validate_horizon_vs_granularity,
     filter_by_time_window,
@@ -34,7 +32,7 @@ _pallette = [
     "#b51963",
 ]
 
-BACKEND_URL = "http://localhost:8000/forecast"
+BACKEND_URL = "http://forecast_api:8000/forecast"
 TIMEOUT = 300  # HTTP timeout in seconds
 
 DATES = "./data/raw/shop_sales_dates.csv"

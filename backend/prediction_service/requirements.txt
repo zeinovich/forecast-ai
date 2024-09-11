@@ -1,0 +1,5 @@
+etna[prophet]==2.9.0
+fastapi==0.114.1
+pandas==1.5.3
+scikit_learn==1.0.2
+uvicorn==0.30.6
