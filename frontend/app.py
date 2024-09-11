@@ -48,32 +48,10 @@ _metrics = [
 
 
 # [TODO] - zeinovich - make adaptive form for file download
-def upload_standard_data(expander: DeltaGenerator):
-    dates_file = expander.file_uploader("Upload dates CSV", type="csv")
-    sales_file = expander.file_uploader("Upload Sales CSV", type="csv")
-    prices_file = expander.file_uploader("Upload Prices CSV", type="csv")
-
-    css = """
-        <style>
-            [data-testid='stFileUploader'] {
-                width: max-container;
-            }
-            [data-testid='stFileUploader'] section {
-                padding: 0;
-                float: left;
-            }
-            [data-testid='stFileUploader'] section > input + div {
-                display: none;
-            }
-            [data-testid='stFileUploader'] section + div {
-                float: left;
-                padding-top: 0;
-            }
-
-        </style>
-    """
-
-    st.sidebar.markdown(css, unsafe_allow_html=True)
+def upload_standard_data():
+    dates_file = "./data/shop_sales_dates.csv"
+    sales_file = "./data/shop_sales.csv"
+    prices_file = "./data/shop_sales_prices.csv"
 
     return dates_file, sales_file, prices_file
 
@@ -111,22 +89,29 @@ def reset_forecast():
         del st.session_state["response"]
 
 
-def get_dataset_features(df: pd.DataFrame):
+def get_dataset_features(df: pd.DataFrame, is_standard_format: bool):
     expander = st.sidebar.expander("DFU settings", expanded=True)
-    segment_name = expander.selectbox(
-        "Select ID column", df.columns.tolist(), on_change=reset_forecast
-    )
+
+    if not is_standard_format:
+        segment_name = expander.selectbox(
+            "Select ID column", df.columns.tolist(), on_change=reset_forecast
+        )
+        target_name = expander.selectbox(
+            "Select target column", df.columns.tolist(), on_change=reset_forecast
+        )
+        date_name = expander.selectbox(
+            "Select date column", df.columns.tolist(), on_change=reset_forecast
+        )
+
+    else:
+        segment_name = "item_id"
+        target_name = "cnt"
+        date_name = "date"
+
     unique_segments = df[segment_name].unique().tolist()
 
     segments = expander.multiselect(
         f"Select {segment_name}", sorted(unique_segments), on_change=reset_forecast
-    )
-
-    target_name = expander.selectbox(
-        "Select target column", df.columns.tolist(), on_change=reset_forecast
-    )
-    date_name = expander.selectbox(
-        "Select date column", df.columns.tolist(), on_change=reset_forecast
     )
 
     return target_name, date_name, segment_name, segments
@@ -206,7 +191,7 @@ def main():
     )
 
     if is_standard_format:
-        dates_file, sales_file, prices_file = upload_standard_data(upload_expander)
+        dates_file, sales_file, prices_file = upload_standard_data()
 
         # Load the uploaded data
         if dates_file and sales_file and prices_file:
@@ -231,7 +216,9 @@ def main():
 
     # [TODO] - zeinovich - make adaptive form for target cols selection
     # [TODO] - zeinovich - place value if no store selection
-    target_name, date_name, segment_name, segments = get_dataset_features(sales_df)
+    target_name, date_name, segment_name, segments = get_dataset_features(
+        sales_df, is_standard_format
+    )
 
     forecast_expander = st.sidebar.expander("Forecast Settings", expanded=True)
     forecast_settings = get_forecast_settings(forecast_expander)
@@ -336,27 +323,22 @@ def main():
         sales_for_display["lower"] = sales_for_display[target_name]
         sales_for_display = sales_for_display.rename(
             {
+                segment_name: "segment",
                 target_name: "predicted",
                 date_name: "date",
             },
             axis=1,
         )
+        sales_for_display = sales_for_display.sort_values(by="date")
 
         event_dates = dates_for_display[dates_for_display["event_type_1"].notna()][
             ["date", "event_name_1", "event_type_1"]
         ]
-        # [TODO] - multiSKU
-        # sales_plot = sku_plot(
-        #     sales_for_display,
-        #     x=date_name,
-        #     y=target_name,
-        #     segments=segments,
-        #     segment_name=segment_name,
-        # )
+
         sales_plot = None
 
         for segment, c in zip(segments, _pallette):
-            seg_hist = sales_for_display[sales_for_display[segment_name] == segment]
+            seg_hist = sales_for_display[sales_for_display["segment"] == segment]
 
             sales_plot = (
                 forecast_plot(
@@ -369,10 +351,11 @@ def main():
                 else sales_plot
             )
 
-        sales_plot = add_events(event_dates, sales_plot)
+            forecast_data.loc[len(forecast_data), :] = seg_hist.iloc[-1, :]
 
-        forecast_data = forecast_data.sort_values("date")
-        sales_for_display = sales_for_display.sort_values(by="date")
+        forecast_data = forecast_data.sort_values(by="date")
+
+        sales_plot = add_events(event_dates, sales_plot)
 
         min_y, max_y = (
             sales_for_display["predicted"].min(),
@@ -385,6 +368,7 @@ def main():
 
     for segment, c in zip(segments, _pallette):
         forecast_seg = forecast_data[forecast_data["segment"] == segment]
+
         sales_plot = forecast_plot(
             forecast_seg,
             segment,
