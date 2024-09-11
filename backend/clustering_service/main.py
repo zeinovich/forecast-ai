@@ -10,6 +10,7 @@ app = FastAPI()
 @app.post("/clasterize/")
 async def clusterize(payload: dict):
     """
+    #1
     Эндпоинт кластеризации данных.
     Определяет оптимальное количество кластеров и проводит кластеризацию.
     """
