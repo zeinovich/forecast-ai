@@ -33,15 +33,12 @@ async def predict(payload: dict):
     metric = payload["metric"]
     top_k_features = payload["top_k_features"]
 
-    print(target_segment_names)
-
-    # decoded_data = base64.b64decode(data)
-    # df = pd.read_csv(BytesIO(decoded_data))
-
     df = pickle.loads(base64.b64decode(data.encode()))
 
+    df = df[df[segment_name].isin(target_segment_names)]
+
     df = preprocess_data(df, target_name, date_name, segment_name, granularity)
-    prediction_df = predict_with_model(
+    prediction_df, metrics_df = predict_with_model(
         df,
         target_segment_names,
         horizon // granularity,
@@ -49,19 +46,10 @@ async def predict(payload: dict):
         metric,
         top_k_features=top_k_features,
     )
-
-    prediction_df = prediction_df[prediction_df["segment"].isin(target_segment_names)]
-
-    # buffer_pred = BytesIO()
-    # prediction_df.to_csv(buffer_pred, index=False)
-    # encoded_predictions = base64.b64encode(buffer_pred.getvalue()).decode("utf-8")
-
-    # buffer_metrics = BytesIO()
-    # encoded_metrics = base64.b64encode(buffer_metrics.getvalue()).decode("utf-8")
     encoded_predictions = encode_dataframe(prediction_df)
-    # encoded_metrics = encode_dataframe(metrics_df)
+    encoded_metrics = encode_dataframe(metrics_df)
 
     return {
         "encoded_predictions": encoded_predictions,
-        "encoded_metrics": 0,
+        "encoded_metrics": encoded_metrics,
     }

@@ -1,6 +1,6 @@
 import importlib
 from etna.datasets import TSDataset
-from etna.metrics import SMAPE, MAE, MSE, MAPE
+from etna.metrics import SMAPE, MAE, MSE
 from etna.pipeline import Pipeline
 from etna.transforms import (
     DensityOutliersTransform,
@@ -69,10 +69,15 @@ def preprocess_data(
 
     if granularity == 1:
         ts_dataset = TSDataset(df, freq="D")
+
     elif granularity == 7:
         ts_dataset = TSDataset(df, freq="W")
+
     elif granularity == 30:
         ts_dataset = TSDataset(df, freq="M")
+
+    else:
+        raise ValueError(f"Invalid value for granularity ({granularity})")
 
     # ts_dataset = generate_features_etna(ts_dataset)
     # ts_dataset = remove_outliners(ts_dataset)
@@ -177,7 +182,7 @@ def predict_with_model(
     Интерфейс предсказания через выбранную модель.
     Модели подключаются отдельно.
 
-    :param df: данные для предсказания
+    :param TSDataset df: данные для предсказания
     :param target_segment_names: сегменты для которых неодходимо предсказать
     :param horizon: горизонт предсказания
     :param model: модель, которая будет использована
@@ -209,21 +214,17 @@ def predict_with_model(
         tfs_transform,
     ]
 
-    df.fit_transform(transforms)
-
     if model_name == "" or not model_name:
         raise ValueError("Should provide model_name")
     else:
         model_class = import_model_class(model_name)
         model = model_class()
+        pipeline = Pipeline(model=model, transforms=transforms, horizon=horizon)
 
-    model.fit(df)
+    pipeline.fit(df)
 
-    df.df = df[:, target_segment_names, :]
-    future = df.make_future(future_steps=horizon, transforms=transforms, tail_steps=1)
-
-    forecast_ts = model.forecast(ts=future, prediction_interval=True)
-    forecast_ts.inverse_transform(transforms)
+    forecast_ts = pipeline.forecast(prediction_interval=True)
+    # forecast_ts.inverse_transform(transforms)
     forecast_df = forecast_ts.df.loc[
         :, pd.IndexSlice[:, ["target", "target_0.025", "target_0.975"]]
     ]
@@ -238,12 +239,16 @@ def predict_with_model(
         ["timestamp", "segment", "target", "target_0.025", "target_0.975"]
     ]
 
-    # if metric:
-    #     metrics_df, _, _ = pipeline.backtest(
-    #         ts=df,
-    #         metrics=[MAE(), MSE(), MAPE(), SMAPE()],
-    #         n_folds=3,
-    #         aggregate_metrics=True,
-    #     )
+    if metric:
+        metrics_df, _, _ = pipeline.backtest(
+            ts=df,
+            metrics=[MAE(), MSE(), SMAPE()],
+            n_folds=3,
+            aggregate_metrics=True,
+        )
+    else:
+        metrics_df = pd.DataFrame(
+            data=["no metric passed"], columns=["metrics"], index=["segment"]
+        )
 
-    return forecast_df
+    return forecast_df, metrics_df
