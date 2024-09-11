@@ -15,7 +15,7 @@ from streamlit.delta_generator import DeltaGenerator
 
 import pandas as pd
 
-from src.plots import sku_plot, add_events, add_minmax, forecast_plot
+from src.plots import forecast_plot, add_events, add_minmax
 from src.preprocessing import (
     default_prepare_datasets,
     validate_horizon_vs_granularity,
@@ -342,10 +342,12 @@ def main():
 
             sales_plot = (
                 forecast_plot(
-                    seg_hist,
-                    segment,
-                    sales_plot,
+                    data=seg_hist,
+                    segment=segment,
+                    trace_name=segment,
+                    fig=sales_plot,
                     scatter_args={"line": {"color": c}},
+                    plot_ci=False,
                 )
                 if len(seg_hist) > 0
                 else sales_plot
@@ -370,10 +372,12 @@ def main():
         forecast_seg = forecast_data[forecast_data["segment"] == segment]
 
         sales_plot = forecast_plot(
-            forecast_seg,
-            segment,
-            sales_plot,
+            data=forecast_seg,
+            segment=segment,
+            trace_name=None,
+            fig=sales_plot,
             scatter_args={"line": {"color": c, "dash": "dash"}},
+            plot_ci=len(segments) == 1,  # plot CI only if forecast for 1 segment
         )
 
     sales_st.plotly_chart(sales_plot)

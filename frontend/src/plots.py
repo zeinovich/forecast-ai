@@ -13,42 +13,6 @@ _pallette = [
 ]
 
 
-def sku_plot(
-    df: pd.DataFrame, x: str, y: str, segment_name: str, segments: List[str]
-) -> go.Figure:
-    """
-    Plots line plot from data. Data distribution is appended to the left of a line plot
-
-    Args:
-        df (pd.DataFrame): Data
-        x (str): X-axis column
-        y (str): Y-axis column (also used for histogram)
-        title (str): Figure title
-        labels (Dict[str, str]): Column names, i.e. {"sell_price": "Sell Price"}
-
-    Returns:
-        go.Figure: Plotly plot
-    """
-    # Create 2 subplots with shared Y-axis
-    # Left subplot - Line plot (80% width)
-    # Right subplot - histogram of values in y column (20% width)
-    plot = go.Figure()
-
-    for segment in segments:
-        df_ = df[df[segment_name] == segment]
-        plot.add_trace(
-            go.Scatter(
-                x=df_[x],
-                y=df_[y],
-                mode="lines",
-                name=segment,
-                showlegend=False,
-            )
-        )
-
-    return plot
-
-
 def add_minmax(
     plot: go.Figure, min_y: float, max_y: float, min_x: float, max_x: float
 ) -> go.Figure:
@@ -129,16 +93,18 @@ def add_events(event_dates: pd.DataFrame, plot: go.Figure) -> go.Figure:
 
 
 def forecast_plot(
-    forecast_data: pd.DataFrame,
+    data: pd.DataFrame,
     segment: str,
+    trace_name: str = None,
     fig: go.Figure = None,
     scatter_args: Dict[str, Any] = None,
+    plot_ci: bool = False,
 ) -> go.Figure:
     """
     Plotting function for forecast.
 
     Args:
-        forecast_data (pd.DataFrame): Dataframe consisting of following columns:\
+        data (pd.DataFrame): Dataframe consisting of following columns:\
             `["date", "predicted", "upper", "lower"]`, where "upper" and "lower"\
             are confidence intervals (CIs). If it's not possible to compute CIs, leave NaN
 
@@ -153,39 +119,40 @@ def forecast_plot(
 
     fig.add_trace(
         go.Scatter(
-            x=forecast_data["date"],
-            y=forecast_data["predicted"],
+            x=data["date"],
+            y=data["predicted"],
             mode="lines",
-            name=f"Prediction ({segment})",
-            showlegend=True,
+            name=trace_name,
+            showlegend=trace_name is not None,
             **scatter_args,
         )
     )
 
     # Prediction intervals (Uncertainty bounds) shaded area
-    fig.add_trace(
-        go.Scatter(
-            x=forecast_data["date"],
-            y=forecast_data["upper"],
-            mode="lines",
-            line=dict(width=0),
-            name=f"Upper Bound ({segment})",
-            showlegend=False,
+    if plot_ci:
+        fig.add_trace(
+            go.Scatter(
+                x=data["date"],
+                y=data["upper"],
+                mode="lines",
+                line=dict(width=0),
+                name=f"Upper Bound ({segment})",
+                showlegend=False,
+            )
         )
-    )
 
-    fig.add_trace(
-        go.Scatter(
-            x=forecast_data["date"],
-            y=forecast_data["lower"],
-            mode="lines",
-            line=dict(width=0),
-            fill="tonexty",
-            fillcolor="rgba(68, 68, 68, 0.3)",
-            name=f"Lower Bound ({segment})",
-            showlegend=False,
+        fig.add_trace(
+            go.Scatter(
+                x=data["date"],
+                y=data["lower"],
+                mode="lines",
+                line=dict(width=0),
+                fill="tonexty",
+                fillcolor="rgba(68, 68, 68, 0.3)",
+                name=f"Lower Bound ({segment})",
+                showlegend=False,
+            )
         )
-    )
 
     fig.update_layout(
         title="Predicted Demand with Uncertainty Bounds",
