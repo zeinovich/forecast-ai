@@ -32,7 +32,7 @@ _pallette = [
     "#b51963",
 ]
 
-BACKEND_URL = "http://localhost:8000/forecast"
+BACKEND_URL = "http://forecast_api:8000/forecast"
 TIMEOUT = 300  # HTTP timeout in seconds
 
 DATES = "./data/raw/shop_sales_dates.csv"
