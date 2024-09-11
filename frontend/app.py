@@ -275,6 +275,7 @@ def main():
         # append last history point to prediction
         response = st.session_state["response"].json()
         forecast_data = decode_dataframe(response["encoded_predictions"])
+        metrics_data = decode_dataframe(response["encoded_metrics"])
         forecast_data = forecast_data.rename(
             {
                 "timestamp": "date",
@@ -284,13 +285,15 @@ def main():
             },
             axis=1,
         )
-        # forecast_metrics = decode_dataframe(response["encoded_metrics"])
-        # forecast_data = st.session_state["response"]
-        # st.success("Forecast generated successfully!")
+
         table = st.expander("Forecast Table")
         # Display the forecast data
         forecast_data_for_display = process_forecast_table(forecast_data, date_name)
         table.data_editor(forecast_data_for_display, use_container_width=True)
+
+        mtable = st.expander("Metrics Table")
+        # Display the forecast data
+        mtable.data_editor(metrics_data, use_container_width=True)
 
     else:
         st.error("Failed to get forecast. Please check your settings and try again.")
