@@ -50,6 +50,8 @@ async def predict(payload: dict):
         top_k_features=top_k_features,
     )
 
+    prediction_df = prediction_df[prediction_df["segment"].isin(target_segment_names)]
+
     # buffer_pred = BytesIO()
     # prediction_df.to_csv(buffer_pred, index=False)
     # encoded_predictions = base64.b64encode(buffer_pred.getvalue()).decode("utf-8")

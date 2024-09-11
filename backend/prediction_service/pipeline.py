@@ -220,7 +220,7 @@ def predict_with_model(
     model.fit(df)
 
     df.df = df[:, target_segment_names, :]
-    future = df.make_future(future_steps=horizon, transforms=transforms)
+    future = df.make_future(future_steps=horizon, transforms=transforms, tail_steps=1)
 
     forecast_ts = model.forecast(ts=future, prediction_interval=True)
     forecast_ts.inverse_transform(transforms)
