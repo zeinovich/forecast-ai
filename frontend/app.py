@@ -132,7 +132,7 @@ def get_dataset_features(df: pd.DataFrame):
     return target_name, date_name, segment_name, segments
 
 
-def get_forecast_settings(forecast_expander):
+def get_forecast_settings(forecast_expander: DeltaGenerator):
     # Assuming SKU and Store columns exist in sales and prices
 
     # SKU and Store selection
@@ -163,13 +163,26 @@ def get_forecast_settings(forecast_expander):
         on_change=reset_forecast,
     )
 
+    top_k_features = forecast_expander.select_slider(
+        "Top K features", list(range(1, 21, 1)), on_change=reset_forecast
+    )
+    top_k_features = (
+        top_k_features if not forecast_expander.checkbox("Use all features") else 10**6
+    )
+
     metric = forecast_expander.selectbox(
         "Select Metric",
         _metrics,
         on_change=reset_forecast,
     )
 
-    return h_int, g_int, model, metric
+    return {
+        "horizon": h_int,
+        "granularity": g_int,
+        "model": model,
+        "metric": metric,
+        "top_k_features": top_k_features,
+    }
 
 
 def process_forecast_table(df: pd.DataFrame, date_name: str):
@@ -221,7 +234,7 @@ def main():
     target_name, date_name, segment_name, segments = get_dataset_features(sales_df)
 
     forecast_expander = st.sidebar.expander("Forecast Settings", expanded=True)
-    horizon, granularity, model, metric = get_forecast_settings(forecast_expander)
+    forecast_settings = get_forecast_settings(forecast_expander)
 
     # Filter the data based on selected SKU and Store
     filtered_sales = sales_df.copy()
@@ -247,11 +260,11 @@ def main():
             "segment_name": segment_name,
             "target_segment_names": segments,
             "data": encode_dataframe(sales_df),
-            "horizon": horizon,
-            "granularity": granularity,
-            "model": model,
-            "metric": metric,
-            "top_k_features": 10,
+            "horizon": forecast_settings.get("horizon", None),
+            "granularity": forecast_settings.get("granularity", None),
+            "model": forecast_settings.get("model", None),
+            "metric": forecast_settings.get("metric", None),
+            "top_k_features": forecast_settings.get("top_k_features", None),
         }
 
         # Send request to the backend (example backend port assumed to be 8000)

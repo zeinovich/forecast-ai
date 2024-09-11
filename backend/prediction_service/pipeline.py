@@ -191,7 +191,7 @@ def predict_with_model(
     """
 
     tfs_transform = TreeFeatureSelectionTransform(
-        model="catboost",
+        model="random_forest",
         top_k=top_k_features,
     )
     date_flags_transform = DateFlagsTransform(
