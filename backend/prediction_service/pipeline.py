@@ -1,5 +1,4 @@
 import importlib
-from etna.auto import Auto
 from etna.datasets import TSDataset
 from etna.metrics import SMAPE, MAE, MSE, MAPE
 from etna.pipeline import Pipeline
@@ -213,10 +212,7 @@ def predict_with_model(
     df.fit_transform(transforms)
 
     if model_name == "" or not model_name:
-        auto = Auto(
-            target_metric=SMAPE(), horizon=horizon, backtest_params=dict(n_folds=5)
-        )
-        pipeline = auto.fit(ts=df, tune_size=0)
+        raise ValueError("Should provide model_name")
     else:
         model_class = import_model_class(model_name)
         model = model_class()
