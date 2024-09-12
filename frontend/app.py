@@ -38,7 +38,12 @@ TIMEOUT = 300  # HTTP timeout in seconds
 
 DATES = "./data/raw/shop_sales_dates.csv"
 
-_models = ["linear.LinearPerSegmentModel", "AutoARIMAModel", "prophet.ProphetModel"]
+_models = [
+    "prophet.ProphetModel",
+    "NaiveModel",
+    "CatBoostMultiSegmentModel",
+    "ElasticMultiSegmentModel",
+]
 
 _metrics = [
     "MSE",
