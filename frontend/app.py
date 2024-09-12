@@ -92,6 +92,40 @@ def upload_data(expander: DeltaGenerator):
     return sales_file
 
 
+def aggregate(df: pd.DataFrame, granularity: int) -> pd.DataFrame:
+    """
+    Aggregates data by given granularity (1 = day, 7 = week, 30 = month) for each segment.
+    
+    Parameters:
+    - df: DataFrame with 'timestamp', 'segment', and 'target' columns.
+    - granularity: integer defining the granularity (1 - day, 7 - week, 30 - month).
+    
+    Returns:
+    - Aggregated DataFrame.
+    """
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    
+    if granularity == 1:
+        freq = 'D'  # day
+    elif granularity == 7:
+        freq = 'W'  # week
+    elif granularity == 30:
+        freq = 'M'  # month
+    else:
+        raise ValueError("Granularity must be 1 (day), 7 (week), or 30 (month).")
+    
+    df.set_index('timestamp', inplace=True)
+    
+    aggregated_df = (
+        df.groupby('segment')
+          .resample(freq)['target']
+          .sum()
+          .reset_index()
+    )
+
+    return aggregated_df
+
+
 def reset_forecast():
     if "response" in st.session_state:
         del st.session_state["response"]
@@ -355,6 +389,12 @@ def main():
 
     # Filter data by the selected time window
     if len(filtered_sales) > 0:
+        # Используем granularity из forecast_settings
+        granularity = forecast_settings["granularity"]
+        
+        # Агрегируем данные
+        sales_for_display = aggregate(filtered_sales, granularity)
+        
         sales_for_display = filter_by_time_window(filtered_sales, "timestamp", cutoff)
         dates_for_display = filter_by_time_window(dates, date_name, cutoff)
 
