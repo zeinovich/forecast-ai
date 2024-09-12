@@ -56,7 +56,7 @@ def validate_horizon_vs_granularity(horizon, granularity):
 
 
 def filter_by_time_window(
-    df: pd.DataFrame, date_column: str, window: str
+    df: pd.DataFrame, date_column: str, window: str, num_steps: int = 1
 ) -> pd.DataFrame:
     """
     Filters dataframe by specified column and time window.
@@ -73,13 +73,13 @@ def filter_by_time_window(
     latest_date = df[date_column].max()
 
     if window == "1-week":
-        start_date = latest_date - timedelta(weeks=1)
+        start_date = latest_date - timedelta(weeks=1) * num_steps
     elif window == "1-month":
-        start_date = latest_date - timedelta(weeks=4)
+        start_date = latest_date - timedelta(weeks=4) * num_steps
     elif window == "3-month":
-        start_date = latest_date - timedelta(weeks=12)
+        start_date = latest_date - timedelta(weeks=12) * num_steps
     elif window == "1-year":
-        start_date = latest_date - timedelta(weeks=52)
+        start_date = latest_date - timedelta(weeks=52) * num_steps
     else:
         return df
 

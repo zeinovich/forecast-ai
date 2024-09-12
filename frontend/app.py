@@ -217,6 +217,12 @@ def main():
 
     # [TODO] - zeinovich - make adaptive form for target cols selection
     # [TODO] - zeinovich - place value if no store selection
+    cluster_df = filter_by_time_window(sales_df, "date", "1-month", num_steps=3)
+    payload = {"data": encode_dataframe(cluster_df)}
+    response = requests.post(CLUSTER_URL, json=payload, timeout=TIMEOUT)
+    clusters = decode_dataframe(response.json()["encoded_dataframe"])
+    st.write(clusters)
+
     target_name, date_name, segment_name, segments = get_dataset_features(
         sales_df, is_standard_format
     )
