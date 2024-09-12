@@ -217,17 +217,14 @@ def main():
 
     # [TODO] - zeinovich - make adaptive form for target cols selection
     # [TODO] - zeinovich - place value if no store selection
-    cluster_df = filter_by_time_window(sales_df, "date", "1-month", num_steps=3)
-    payload = {"data": encode_dataframe(cluster_df)}
-    response = requests.post(CLUSTER_URL, json=payload, timeout=TIMEOUT)
-    clusters = decode_dataframe(response.json()["encoded_dataframe"])
-    st.write(clusters)
-
     target_name, date_name, segment_name, segments = get_dataset_features(
         sales_df, is_standard_format
     )
     forecast_expander = st.sidebar.expander("Forecast Settings", expanded=True)
     forecast_settings = get_forecast_settings(forecast_expander)
+    num_steps_for_clusterization = forecast_expander.select_slider(
+        "Clusterization history", list(range(1, 13, 1)), value=3
+    )
 
     # Filter the data based on selected SKU and Store
     filtered_sales = sales_df.copy()
@@ -244,8 +241,10 @@ def main():
     if len(filtered_sales) > 0:
         filtered_sales = filtered_sales.sort_values(by=date_name)
 
+    forecast = forecast_expander.button("Get Forecast")
+
     # Button to trigger the forecast request
-    if forecast_expander.button("Get Forecast"):
+    if forecast:
         # Create payload with forecast settings
         payload = {
             "target_name": target_name,
@@ -259,11 +258,22 @@ def main():
             "metric": forecast_settings.get("metric", None),
             "top_k_features": forecast_settings.get("top_k_features", None),
         }
+        cluster_payload = {
+            "data": encode_dataframe(
+                filter_by_time_window(
+                    sales_df, date_name, "1-month", num_steps_for_clusterization
+                )
+            )
+        }
 
         # Send request to the backend (example backend port assumed to be 8000)
         # Update this with the correct backend URL
         response = requests.post(FORECAST_URL, json=payload, timeout=TIMEOUT)
+        clusters_response = requests.post(
+            CLUSTER_URL, json=cluster_payload, timeout=TIMEOUT
+        )
         st.session_state["response"] = response
+        st.session_state["clusters_response"] = clusters_response
 
     elif "response" in st.session_state:
         pass
@@ -387,6 +397,21 @@ def main():
         )
 
     sales_st.plotly_chart(sales_plot)
+
+    cluster_section = st.expander("Clusterization")
+
+    if (
+        "clusters_response" in st.session_state
+        and st.session_state["clusters_response"].status_code == 200
+    ):
+        response = st.session_state["clusters_response"].json()
+        clusters_df = decode_dataframe(response["encoded_dataframe"])
+
+        clusters_df = clusters_df.groupby("cluster").agg(
+            list
+        )  # .reset_index(name="Segments")
+
+        cluster_section.data_editor(clusters_df)
 
 
 if __name__ == "__main__":
