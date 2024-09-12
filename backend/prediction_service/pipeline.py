@@ -1,3 +1,4 @@
+from typing import Dict, Any, List
 import importlib
 
 from etna.datasets import TSDataset
@@ -92,7 +93,7 @@ def import_model_class(model_name: str):
 
 
 def calculate_average_forecast(
-    df: TSDataset, horizon: int, average_segments: list[str] = None
+    df: pd.DataFrame, horizon: int, granularity: int, info: Dict[str, List[str] | Any]
 ):
     """
     Рассчитывает средний прогноз по выбранным или всем сегментам.
@@ -102,9 +103,12 @@ def calculate_average_forecast(
     :param average_segments: список сегментов для усреднения (если None, используются все сегменты)
     :return: DataFrame с средним прогнозом
     """
-    all_data = df.to_pandas(flatten=True)
+    all_data = df.copy()
 
-    if average_segments:
+    name_ = info["name"]
+    average_segments = info["similar"]
+
+    if average_segments != 0:
         mean_data = all_data[all_data["segment"].isin(average_segments)]
     else:
         mean_data = all_data
@@ -113,13 +117,13 @@ def calculate_average_forecast(
 
     last_date = all_data["timestamp"].max()
     future_dates = pd.date_range(
-        start=last_date + pd.Timedelta(days=1), periods=horizon
+        start=last_date + pd.Timedelta(days=granularity), periods=horizon
     )
 
     avg_forecast = pd.DataFrame(
         {
             "timestamp": future_dates,
-            "segment": ["WITHOUT HISTORY"] * horizon,
+            "segment": [name_] * horizon,
             "target": [mean_target] * horizon,
             "target_0.025": [mean_target * 0.9]
             * horizon,  # Примерный доверительный интервал
@@ -135,7 +139,6 @@ def predict_with_model(
     horizon: int,
     model_name: str,
     top_k_features: int,
-    average_segments: list[str] = None,
 ):
     """
     Интерфейс предсказания через выбранную модель.
@@ -144,7 +147,6 @@ def predict_with_model(
     :param horizon: горизонт предсказания
     :param model_name: название модели, которая будет использована
     :param top_k_features: количество лучших признаков для отбора
-    :param average_segments: список сегментов для усреднения прогноза товаров без истории
     :return: предсказанные значения и метрики
     """
     tfs_transform = TreeFeatureSelectionTransform(
@@ -192,11 +194,6 @@ def predict_with_model(
     forecast_df = forecast_df[
         ["timestamp", "segment", "target", "target_0.025", "target_0.975"]
     ]
-
-    # Добавляем прогноз для товаров без истории
-    avg_forecast = calculate_average_forecast(df, horizon, average_segments)
-    forecast_df = pd.concat([forecast_df, avg_forecast], ignore_index=True)
-
     metrics_df, _, _ = pipeline.backtest(
         ts=df,
         metrics=[MAE(), SMAPE()],

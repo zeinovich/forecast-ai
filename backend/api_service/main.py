@@ -15,7 +15,7 @@ TIMEOUT = 300
 
 
 @app.post("/forecast/")
-async def get_forecast(payload: Dict[str, str]) -> Dict[str, str]:
+async def get_forecast(payload: dict) -> dict:
     """
     Основная точка входа для управления задачами.
     Перенаправляет запрос на Prediction-сервис.
@@ -33,7 +33,7 @@ async def get_forecast(payload: Dict[str, str]) -> Dict[str, str]:
 
 
 @app.post("/clusterize/")
-async def get_clusters_dataset(payload: Dict[str, str]) -> Dict[str, str]:
+async def get_clusters_dataset(payload: dict) -> dict:
     """
     Эндпоинт для кластеризации данных.
     Перенаправляет запрос на Clustering-сервис.

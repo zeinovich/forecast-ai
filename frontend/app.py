@@ -8,6 +8,8 @@ To start app run: `streamlit run ./frontend/app.py`
 Author: zeinovich
 """
 
+from typing import Dict, Any
+
 import requests
 
 import streamlit as st
@@ -123,6 +125,27 @@ def get_dataset_features(df: pd.DataFrame, is_standard_format: bool):
     return target_name, date_name, segment_name, segments
 
 
+def add_new_segments(df: pd.DataFrame) -> Dict[Any, Any]:
+    add_new = st.sidebar.expander("New IDs")
+
+    name_ = add_new.text_input(label="Name of new ID")
+
+    unique_segments = ["all"] + sorted(df["segment"].unique().tolist())
+
+    similar = add_new.multiselect("Select similar IDs", unique_segments, default=None)
+
+    if name_ is None or similar is None:
+        add_new.warning("Fill name")
+        st.stop()
+
+    if similar == ["all"]:
+        similar = 0
+
+    no_history = {"name": name_, "similar": similar}
+
+    return no_history
+
+
 def get_forecast_settings(forecast_expander: DeltaGenerator):
     # Assuming SKU and Store columns exist in sales and prices
 
@@ -226,6 +249,9 @@ def main():
     sales_df = sales_df.rename(
         {target_name: "target", segment_name: "segment", date_name: "timestamp"}, axis=1
     )
+
+    no_history = add_new_segments(sales_df)
+
     forecast_expander = st.sidebar.expander("Forecast Settings", expanded=True)
     forecast_settings = get_forecast_settings(forecast_expander)
     num_steps_for_clusterization = forecast_expander.select_slider(
@@ -258,6 +284,7 @@ def main():
             "granularity": forecast_settings.get("granularity", None),
             "model": forecast_settings.get("model", None),
             "top_k_features": forecast_settings.get("top_k_features", None),
+            "no_history": no_history,
         }
         cluster_payload = {
             "data": encode_dataframe(
@@ -266,7 +293,6 @@ def main():
                 )
             )
         }
-
         # Send request to the backend (example backend port assumed to be 8000)
         # Update this with the correct backend URL
         response = requests.post(FORECAST_URL, json=payload, timeout=TIMEOUT)
@@ -310,6 +336,9 @@ def main():
         # Display the forecast data
         mtable.data_editor(metrics_data, use_container_width=True)
 
+        if no_history is not None:
+            segments.append(no_history["name"])
+
     else:
         st.error("Failed to get forecast. Please check your settings and try again.")
         st.stop()
@@ -346,6 +375,9 @@ def main():
         for segment, c in zip(segments, _pallette):
             seg_hist = sales_for_display[sales_for_display["segment"] == segment]
 
+            if len(seg_hist) == 0:
+                continue
+
             sales_plot = (
                 forecast_plot(
                     data=seg_hist,
@@ -377,10 +409,16 @@ def main():
     for segment, c in zip(segments, _pallette):
         forecast_seg = forecast_data[forecast_data["segment"] == segment]
 
+        trace_name = (
+            segment
+            if no_history is not None and no_history["name"] == segment
+            else None
+        )
+
         sales_plot = forecast_plot(
             data=forecast_seg,
             segment=segment,
-            trace_name=None,
+            trace_name=trace_name,
             fig=sales_plot,
             scatter_args={"line": {"color": c, "dash": "dash"}},
             plot_ci=len(segments) == 1,  # plot CI only if forecast for 1 segment

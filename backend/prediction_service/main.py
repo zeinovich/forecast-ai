@@ -1,11 +1,12 @@
 import base64
 from typing import Dict
 import pickle
+import logging
 
 from fastapi import FastAPI
 import pandas as pd
 
-from pipeline import preprocess_data, predict_with_model
+from pipeline import preprocess_data, predict_with_model, calculate_average_forecast
 
 app = FastAPI()
 
@@ -18,7 +19,7 @@ def encode_dataframe(df: pd.DataFrame):
 
 
 @app.post("/predict/")
-async def predict(payload: Dict[str, str]) -> Dict[str, str]:
+async def predict(payload: dict) -> dict:
     """
     Интерфейс предсказания.
     Получает данные, предобрабатывает их и вызывает модель для предсказания и доверительных интервалов.
@@ -32,10 +33,11 @@ async def predict(payload: Dict[str, str]) -> Dict[str, str]:
     granularity = payload["granularity"]
     model_name = payload["model"]
     top_k_features = payload["top_k_features"]
+    no_history = payload["no_history"]
 
-    df = pickle.loads(base64.b64decode(data.encode()))
+    data = pickle.loads(base64.b64decode(data.encode()))
 
-    df = df[df["segment"].isin(target_segment_names)]
+    df = data[data["segment"].isin(target_segment_names)]
 
     df = preprocess_data(df, granularity)
     prediction_df, metrics_df = predict_with_model(
@@ -45,6 +47,19 @@ async def predict(payload: Dict[str, str]) -> Dict[str, str]:
         model_name,
         top_k_features=top_k_features,
     )
+
+    if no_history is not None:
+        preds = calculate_average_forecast(
+            data,
+            horizon // granularity,
+            granularity,
+            no_history,
+        )
+        prediction_df = pd.concat(
+            [prediction_df, preds],
+            axis=0,
+        )
+
     encoded_predictions = encode_dataframe(prediction_df)
     encoded_metrics = encode_dataframe(metrics_df)
 
