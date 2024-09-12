@@ -1,3 +1,4 @@
+from typing import Dict, Any, List
 import importlib
 
 from etna.datasets import TSDataset
@@ -33,7 +34,38 @@ def preprocess_data(
 
 
 def aggregate(df: pd.DataFrame, granularity: int) -> TSDataset:
-    return TSDataset(df, freq="D")
+    """
+    Агрегирует данные по заданной гранулярности (1 = день, 7 = неделя, 30 = месяц) и возвращает их в формате TSDataset.
+
+    Параметры:
+    - df: DataFrame с данными временных рядов.
+    - granularity: число, определяющее гранулярность (1 - день, 7 - неделя, 30 - месяц).
+
+    Возвращает:
+    - Агрегированный TSDataset.
+    """
+    # Определяем частоту на основе переданного значения гранулярности
+    if granularity == 1:
+        freq = "D"  # день
+    elif granularity == 7:
+        freq = "W"  # неделя
+    elif granularity == 30:
+        freq = "M"  # месяц
+    else:
+        raise ValueError(
+            "Гранулярность должна быть равна 1 (день), 7 (неделя) или 30 (месяц)."
+        )
+
+    # Преобразуем DataFrame в формат TSDataset с дневной частотой
+    tsdataset = TSDataset.to_dataset(df)
+
+    # Применяем ресемплинг и агрегацию (по умолчанию - среднее значение)
+    resampled_data = tsdataset.resample(freq).sum()
+
+    # Возвращаем агрегированный TSDataset с заданной частотой
+    aggregated_tsdataset = TSDataset(resampled_data, freq=freq)
+
+    return aggregated_tsdataset
 
 
 def generate_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -60,6 +92,48 @@ def import_model_class(model_name: str):
     return model_class
 
 
+def calculate_average_forecast(
+    df: pd.DataFrame, horizon: int, granularity: int, info: Dict[str, List[str] | Any]
+):
+    """
+    Рассчитывает средний прогноз по выбранным или всем сегментам.
+
+    :param df: TSDataset с данными
+    :param horizon: горизонт прогнозирования
+    :param average_segments: список сегментов для усреднения (если None, используются все сегменты)
+    :return: DataFrame с средним прогнозом
+    """
+    all_data = df.copy()
+
+    name_ = info["name"]
+    average_segments = info["similar"]
+
+    if average_segments != 0:
+        mean_data = all_data[all_data["segment"].isin(average_segments)]
+    else:
+        mean_data = all_data
+
+    mean_target = mean_data["target"].mean()
+
+    last_date = all_data["timestamp"].max()
+    future_dates = pd.date_range(
+        start=last_date + pd.Timedelta(days=granularity), periods=horizon
+    )
+
+    avg_forecast = pd.DataFrame(
+        {
+            "timestamp": future_dates,
+            "segment": [name_] * horizon,
+            "target": [mean_target] * horizon,
+            "target_0.025": [mean_target * 0.9]
+            * horizon,  # Примерный доверительный интервал
+            "target_0.975": [mean_target * 1.1] * horizon,
+        }
+    )
+
+    return avg_forecast
+
+
 def predict_with_model(
     df: TSDataset,
     horizon: int,
@@ -68,27 +142,20 @@ def predict_with_model(
 ):
     """
     Интерфейс предсказания через выбранную модель.
-    Модели подключаются отдельно.
 
-    :param TSDataset df: данные для предсказания
-    :param target_segment_names: сегменты для которых неодходимо предсказать
+    :param df: данные для предсказания
     :param horizon: горизонт предсказания
-    :param model: модель, которая будет использована
-    :param metric: необходимо ли возвращать значения метрик
-    :return: предсказанные значения
+    :param model_name: название модели, которая будет использована
+    :param top_k_features: количество лучших признаков для отбора
+    :return: предсказанные значения и метрики
     """
-
     tfs_transform = TreeFeatureSelectionTransform(
         model="random_forest",
         top_k=top_k_features,
     )
     date_flags_transform = DateFlagsTransform(
-        is_weekend=True,
-        day_number_in_month=True,
-        day_number_in_week=True,
-        week_number_in_month=True,
+        is_weekend=True, day_number_in_month=True, day_number_in_week=True
     )
-
     lag_transform = LagTransform(
         in_column="target", lags=list(range(horizon, 2 * horizon + 1, 1))
     )
@@ -105,17 +172,16 @@ def predict_with_model(
         tfs_transform,
     ]
 
-    if model_name == "" or not model_name:
+    if not model_name:
         raise ValueError("Should provide model_name")
-    else:
-        model_class = import_model_class(model_name)
-        model = model_class()
-        pipeline = Pipeline(model=model, transforms=transforms, horizon=horizon)
+
+    model_class = import_model_class(model_name)
+    model = model_class()
+    pipeline = Pipeline(model=model, transforms=transforms, horizon=horizon)
 
     pipeline.fit(df)
 
     forecast_ts = pipeline.forecast(prediction_interval=True)
-
     forecast_df = forecast_ts.df.loc[
         :, pd.IndexSlice[:, ["target", "target_0.025", "target_0.975"]]
     ]
@@ -128,11 +194,10 @@ def predict_with_model(
     forecast_df = forecast_df[
         ["timestamp", "segment", "target", "target_0.025", "target_0.975"]
     ]
-
     metrics_df, _, _ = pipeline.backtest(
         ts=df,
-        metrics=[MAE(), MSE(), SMAPE()],
-        n_folds=3,
+        metrics=[MAE(), SMAPE()],
+        n_folds=5,
         aggregate_metrics=True,
     )
 
