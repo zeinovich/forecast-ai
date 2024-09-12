@@ -1,20 +1,14 @@
+import pickle
+import base64
 import pandas as pd
-from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
 
-def auto_determine_clusters(df: pd.DataFrame, max_clusters: int = 10) -> int:
-    """
-    Автоматически определяем количество кластеров на основе метрики (например, Silhouette Score).
-    """
-    best_score = -1
-    best_n_clusters = 2
 
-    for n_clusters in range(2, max_clusters + 1):
-        model = KMeans(n_clusters=n_clusters)
-        labels = model.fit_predict(df)
-        score = silhouette_score(df, labels)
-        if score > best_score:
-            best_score = score
-            best_n_clusters = n_clusters
+def encode_dataframe(df: pd.DataFrame) -> str:
+    pickled = pickle.dumps(df)
+    pickled_b64 = base64.b64encode(pickled)
+    hug_pickled_str = pickled_b64.decode("utf-8")
+    return hug_pickled_str
 
-    return best_n_clusters
+
+def decode_dataframe(data: str) -> pd.DataFrame:
+    return pickle.loads(base64.b64decode(data.encode()))

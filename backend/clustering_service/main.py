@@ -1,14 +1,13 @@
 from fastapi import FastAPI
-import pandas as pd
-import base64
-from io import BytesIO
-import numpy as np
 import hdbscan
 from tslearn.metrics import cdist_dtw
 
+from utils import decode_dataframe, encode_dataframe
+
 app = FastAPI()
 
-@app.post("/clasterize/")
+
+@app.post("/clusterize/")
 async def clusterize(payload: dict):
     """
     Эндпоинт кластеризации данных.
@@ -17,25 +16,27 @@ async def clusterize(payload: dict):
     """
     # Декодируем данные из base64 в CSV
     data = payload["data"]
-    decoded_data = base64.b64decode(data)
-    df = pd.read_csv(BytesIO(decoded_data))
+    df = decode_dataframe(data)
 
     # Подготовка данных (временные ряды) для кластеризации
-    time_series = df.to_numpy()  # предполагается, что данные представляют временные ряды
+    time_series = (
+        df.to_numpy()
+    )  # предполагается, что данные представляют временные ряды
 
     # Рассчитываем матрицу расстояний DTW
     distance_matrix = cdist_dtw(time_series)
 
     # Применяем HDBSCAN для кластеризации
-    clusterer = hdbscan.HDBSCAN(metric='precomputed', min_cluster_size=2)
+    clusterer = hdbscan.HDBSCAN(metric="precomputed", min_cluster_size=2)
     labels = clusterer.fit_predict(distance_matrix)
 
     # Добавляем метки кластеров к DataFrame
-    df['cluster'] = labels
+    df["cluster"] = labels
 
     # Кодируем результат обратно в base64
-    buffer = BytesIO()
-    df.to_csv(buffer, index=False)
-    encoded_result = base64.b64encode(buffer.getvalue()).decode('utf-8')
+    encoded_result = encode_dataframe(df)
 
-    return {"encoded_dataframe": encoded_result, "n_clusters": len(set(labels)) - (1 if -1 in labels else 0)}
+    return {
+        "encoded_dataframe": encoded_result,
+        "n_clusters": len(set(labels)) - (1 if -1 in labels else 0),
+    }

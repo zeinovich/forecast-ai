@@ -21,6 +21,16 @@ services:
     networks:
       - app_network
 
+  clustering_service:
+    build:
+      context: .
+      dockerfile: ./backend/clustering_service/Dockerfile
+    container_name: cluster
+    ports:
+      - "8002:8002"
+    networks:
+      - app_network
+
   frontend:
     build:
       context: .
