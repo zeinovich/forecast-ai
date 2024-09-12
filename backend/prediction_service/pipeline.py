@@ -35,24 +35,26 @@ def preprocess_data(
 def aggregate(df: pd.DataFrame, granularity: int) -> TSDataset:
     """
     Агрегирует данные по заданной гранулярности (1 = день, 7 = неделя, 30 = месяц) и возвращает их в формате TSDataset.
-    
+
     Параметры:
     - df: DataFrame с данными временных рядов.
     - granularity: число, определяющее гранулярность (1 - день, 7 - неделя, 30 - месяц).
-    
+
     Возвращает:
     - Агрегированный TSDataset.
     """
     # Определяем частоту на основе переданного значения гранулярности
     if granularity == 1:
-        freq = 'D'  # день
+        freq = "D"  # день
     elif granularity == 7:
-        freq = 'W'  # неделя
+        freq = "W"  # неделя
     elif granularity == 30:
-        freq = 'M'  # месяц
+        freq = "M"  # месяц
     else:
-        raise ValueError("Гранулярность должна быть равна 1 (день), 7 (неделя) или 30 (месяц).")
-    
+        raise ValueError(
+            "Гранулярность должна быть равна 1 (день), 7 (неделя) или 30 (месяц)."
+        )
+
     # Преобразуем DataFrame в формат TSDataset с дневной частотой
     tsdataset = TSDataset.to_dataset(df)
 
@@ -63,8 +65,6 @@ def aggregate(df: pd.DataFrame, granularity: int) -> TSDataset:
     aggregated_tsdataset = TSDataset(resampled_data, freq=freq)
 
     return aggregated_tsdataset
-
-
 
 
 def generate_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -90,7 +90,10 @@ def import_model_class(model_name: str):
 
     return model_class
 
-def calculate_average_forecast(df: TSDataset, horizon: int, average_segments: list[str] = None):
+
+def calculate_average_forecast(
+    df: TSDataset, horizon: int, average_segments: list[str] = None
+):
     """
     Рассчитывает средний прогноз по выбранным или всем сегментам.
 
@@ -100,34 +103,39 @@ def calculate_average_forecast(df: TSDataset, horizon: int, average_segments: li
     :return: DataFrame с средним прогнозом
     """
     all_data = df.to_pandas(flatten=True)
-    
+
     if average_segments:
-        mean_data = all_data[all_data['segment'].isin(average_segments)]
+        mean_data = all_data[all_data["segment"].isin(average_segments)]
     else:
         mean_data = all_data
-    
-    mean_target = mean_data['target'].mean()
-    
-    last_date = all_data['timestamp'].max()
-    future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=horizon)
-    
-    avg_forecast = pd.DataFrame({
-        'timestamp': future_dates,
-        'segment': ['WITHOUT HISTORY'] * horizon,
-        'target': [mean_target] * horizon,
-        'target_0.025': [mean_target * 0.9] * horizon,  # Примерный доверительный интервал
-        'target_0.975': [mean_target * 1.1] * horizon
-    })
-    
+
+    mean_target = mean_data["target"].mean()
+
+    last_date = all_data["timestamp"].max()
+    future_dates = pd.date_range(
+        start=last_date + pd.Timedelta(days=1), periods=horizon
+    )
+
+    avg_forecast = pd.DataFrame(
+        {
+            "timestamp": future_dates,
+            "segment": ["WITHOUT HISTORY"] * horizon,
+            "target": [mean_target] * horizon,
+            "target_0.025": [mean_target * 0.9]
+            * horizon,  # Примерный доверительный интервал
+            "target_0.975": [mean_target * 1.1] * horizon,
+        }
+    )
+
     return avg_forecast
-    
+
 
 def predict_with_model(
     df: TSDataset,
     horizon: int,
     model_name: str,
     top_k_features: int,
-    average_segments: list[str] = None
+    average_segments: list[str] = None,
 ):
     """
     Интерфейс предсказания через выбранную модель.
@@ -164,7 +172,7 @@ def predict_with_model(
 
     if not model_name:
         raise ValueError("Should provide model_name")
-    
+
     model_class = import_model_class(model_name)
     model = model_class()
     pipeline = Pipeline(model=model, transforms=transforms, horizon=horizon)
@@ -191,8 +199,8 @@ def predict_with_model(
 
     metrics_df, _, _ = pipeline.backtest(
         ts=df,
-        metrics=[MAE(), MSE(), SMAPE()],
-        n_folds=3,
+        metrics=[MAE(), SMAPE()],
+        n_folds=5,
         aggregate_metrics=True,
     )
 
