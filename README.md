@@ -2,42 +2,50 @@
 
 ## Setup
 
-``dev`` Setup up and activate virtual environment (``python 3.10``) ([venv](https://docs.python.org/3/tutorial/venv.html) or [conda](https://docs.anaconda.com/miniconda/miniconda-install/)) and run:
+To setup service, you need Docker and Docker Compose installed. To setup, run:
 
-    git clone https://github.com/zeinovich/dream-team.git
-    cd dream-team
-    python -m pip install poetry
-    poetry install
+    docker compose build
+    docker compose up -d
 
-## Data
+## Use
 
-``shop_sales_dates.csv``
+### 1. Select data format. 
+`standard` means the data in `train` format (`train` data is preloaded). If chosen, default data preprocessing pipeline will run. If not, provide data in a single CSV file
 
-    date
-    wm_yr_wk: Encoded week (i.e. '11136' -> 1-11-36 - IDK, year 2011, 36th week)
-    weekday
-    wday: INT for week day (starts with Sat = 1)
-    month
-    year
-    event_name_1: Describes events, like holidays, religiuos or big sports events (OrthodoxEaster, Ramadan starts, NBAFinalsStart)
-    event_type_1: Describes type of event: Sporting, Cultural, National, Religious
-    event_name_2: same for 2nd event (optional)
-    event_type_2: same
-    date_id: ID for date for JOINs
-    CASHBACK_STORE_1: If cashback program was active in STORE_1
-    CASHBACK_STORE_2: If cashback program was active in STORE_2
-    CASHBACK_STORE_3: If cashback program was active in STORE_3
+### 2. Select DFU settings
 
-``shop_sales_prices.csv``
+If data is `standard`, you only need to choose one or multiple `item_id` for further forecast. If not select following parameters:
 
-    store_id: one of 'STORE_1', 'STORE_2', 'STORE_3' 
-    item_id: item ID (in format "<STORE_ID>_<ID>)
-    wm_yr_wk: Encoded week
-    sell_price: FLOAT for price, price is set for a week
+    1. Target name: Name of target column for forecast
+    2. Date name: Name of column containing dates for time-series forecast
+    3. ID name: Name of ID column
+    4. ID names: Names of SKUs to forecast (>= 1)
 
-``shop_sales.csv``
+### 3. Select forecast settings
 
-    item_id
-    store_id
-    date_id
-    cnt
+Select following forecast settings:
+
+    1. Horizon: Choose forecast horizon: 1-day, 1-week, 1-month
+    2. Granularity: Choose forecast granularity, i.e. 1-week means that data will be aggregated (sum) on weekly basis
+    3. Model: Choose model for forecast. In future, option "Auto" will be added to select AutoML pipeline. By default - ProphetModel
+    4. Top K features: Choose number of features to select during feature-selection step. Set "Use all features" if no feature-selection is needed. By default - 10
+    5. Metric: [deprecated]
+    6. Clustering history: Choose number on months for clusterization of data. By default - 3
+
+    You're set up for forecasting. It usually takes about a minute.
+
+### 4. Example 1. Standard dataset
+
+    Forecast Plots
+
+![Example of forecast for standard data](./artifacts/standard_forecast.png)
+
+    Tables with forecast and metric. You can edit forecast on your need and download resulting table (upper right corner of table)
+
+![Example of tables for standard data](./artifacts/standard_tables.png)
+
+    Table with clusterization results
+    
+![Example of clusterization on standard data](./artifacts/standard_clusters.png)
+
+
