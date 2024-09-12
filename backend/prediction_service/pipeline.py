@@ -12,6 +12,8 @@ from etna.transforms import (
     TreeFeatureSelectionTransform,
 )
 import pandas as pd
+import shap
+import matplotlib.pyplot as plt
 from sklearn.preprocessing import LabelEncoder
 
 
@@ -219,6 +221,17 @@ def predict_with_model(
 
     model.fit(df)
 
+    # Интерпретация модели с помощью SHAP
+    explainer = shap.TreeExplainer(model.model)  # Убедись, что модель поддерживает shap
+    shap_values = explainer.shap_values(df.to_pandas().drop(columns=["target"]))
+    
+    # Построение графика интерпретации
+    shap.summary_plot(shap_values, df.to_pandas().drop(columns=["target"]), show=False)
+    
+    # Сохранение графика
+    plt.savefig("shap_summary_plot.png")
+    
+    # Прогнозирование
     df.df = df[:, target_segment_names, :]
     future = df.make_future(future_steps=horizon, transforms=transforms)
 
@@ -246,4 +259,4 @@ def predict_with_model(
     #         aggregate_metrics=True,
     #     )
 
-    return forecast_df
+    return forecast_df, "shap_summary_plot.png"
