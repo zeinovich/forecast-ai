@@ -2,6 +2,7 @@ from fastapi import FastAPI
 import hdbscan
 from tslearn.metrics import cdist_dtw
 import pandas as pd
+from sklearn.preprocessing import MinMaxScaler
 from utils import decode_dataframe, encode_dataframe
 
 app = FastAPI()
@@ -25,8 +26,9 @@ async def clusterize(payload: dict):
     for item in items:
         items_ts[item] = df[df["item_id"] == item]["cnt"].to_list()
 
-    items_ts = pd.DataFrame.from_dict(items_ts, orient="index")
-
+    items_ts = pd.DataFrame.from_dict(items_ts, orient="index").T
+    items_ts.iloc[:, :] = MinMaxScaler().fit_transform(items_ts)
+    items_ts = items_ts.T
     # Подготовка данных (временные ряды) для кластеризации
     # предполагается, что данные представляют временные ряды
 
