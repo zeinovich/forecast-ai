@@ -82,7 +82,7 @@ def calculate_average_forecast(df: TSDataset, horizon: int, average_segments: li
     
     avg_forecast = pd.DataFrame({
         'timestamp': future_dates,
-        'segment': ['sku_without_history'] * horizon,
+        'segment': ['WITHOUT HISTORY'] * horizon,
         'target': [mean_target] * horizon,
         'target_0.025': [mean_target * 0.9] * horizon,  # Примерный доверительный интервал
         'target_0.975': [mean_target * 1.1] * horizon
@@ -93,10 +93,8 @@ def calculate_average_forecast(df: TSDataset, horizon: int, average_segments: li
 
 def predict_with_model(
     df: TSDataset,
-    target_segment_names: list[str],
     horizon: int,
     model_name: str,
-    metric: bool,
     top_k_features: int,
     average_segments: list[str] = None
 ):
@@ -104,10 +102,8 @@ def predict_with_model(
     Интерфейс предсказания через выбранную модель.
 
     :param df: данные для предсказания
-    :param target_segment_names: сегменты для которых необходимо предсказать
     :param horizon: горизонт предсказания
     :param model_name: название модели, которая будет использована
-    :param metric: необходимо ли возвращать значения метрик
     :param top_k_features: количество лучших признаков для отбора
     :param average_segments: список сегментов для усреднения прогноза товаров без истории
     :return: предсказанные значения и метрики
@@ -162,18 +158,11 @@ def predict_with_model(
     avg_forecast = calculate_average_forecast(df, horizon, average_segments)
     forecast_df = pd.concat([forecast_df, avg_forecast], ignore_index=True)
 
-    if metric:
-        metrics_df, _, _ = pipeline.backtest(
-            ts=df,
-            metrics=[MAE(), MSE(), SMAPE()],
-            n_folds=3,
-            aggregate_metrics=True,
-        )
-        metrics_df.loc['sku_without_history'] = np.nan
-    else:
-        metrics_df = pd.DataFrame(
-            data=["no metric passed"], columns=["metrics"], index=["segment"]
-        )
-        metrics_df.loc['sku_without_history'] = "no metric passed"
+    metrics_df, _, _ = pipeline.backtest(
+        ts=df,
+        metrics=[MAE(), MSE(), SMAPE()],
+        n_folds=3,
+        aggregate_metrics=True,
+    )
 
     return forecast_df, metrics_df
