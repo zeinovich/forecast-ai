@@ -33,7 +33,38 @@ def preprocess_data(
 
 
 def aggregate(df: pd.DataFrame, granularity: int) -> TSDataset:
-    return TSDataset(df, freq="D")
+    """
+    Агрегирует данные по заданной гранулярности (1 = день, 7 = неделя, 30 = месяц) и возвращает их в формате TSDataset.
+    
+    Параметры:
+    - df: DataFrame с данными временных рядов.
+    - granularity: число, определяющее гранулярность (1 - день, 7 - неделя, 30 - месяц).
+    
+    Возвращает:
+    - Агрегированный TSDataset.
+    """
+    # Определяем частоту на основе переданного значения гранулярности
+    if granularity == 1:
+        freq = 'D'  # день
+    elif granularity == 7:
+        freq = 'W'  # неделя
+    elif granularity == 30:
+        freq = 'M'  # месяц
+    else:
+        raise ValueError("Гранулярность должна быть равна 1 (день), 7 (неделя) или 30 (месяц).")
+    
+    # Преобразуем DataFrame в формат TSDataset с дневной частотой
+    tsdataset = TSDataset.to_dataset(df)
+
+    # Применяем ресемплинг и агрегацию (по умолчанию - среднее значение)
+    resampled_data = tsdataset.resample(freq).sum()
+
+    # Возвращаем агрегированный TSDataset с заданной частотой
+    aggregated_tsdataset = TSDataset(resampled_data, freq=freq)
+
+    return aggregated_tsdataset
+
+
 
 
 def generate_features(df: pd.DataFrame) -> pd.DataFrame:
