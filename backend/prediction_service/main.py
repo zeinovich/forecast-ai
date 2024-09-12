@@ -1,9 +1,10 @@
+import base64
+from typing import Dict
+import pickle
+
 from fastapi import FastAPI
 import pandas as pd
-import base64
 
-# from io import BytesIO
-import pickle
 from pipeline import preprocess_data, predict_with_model
 
 app = FastAPI()
@@ -17,7 +18,7 @@ def encode_dataframe(df: pd.DataFrame):
 
 
 @app.post("/predict/")
-async def predict(payload: dict):
+async def predict(payload: Dict[str, str]) -> Dict[str, str]:
     """
     Интерфейс предсказания.
     Получает данные, предобрабатывает их и вызывает модель для предсказания и доверительных интервалов.

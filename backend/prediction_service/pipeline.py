@@ -1,4 +1,5 @@
 import importlib
+
 from etna.datasets import TSDataset
 from etna.metrics import SMAPE, MAE, MSE
 from etna.pipeline import Pipeline
@@ -10,6 +11,7 @@ from etna.transforms import (
     SegmentEncoderTransform,
     TreeFeatureSelectionTransform,
 )
+
 import pandas as pd
 
 
@@ -25,19 +27,13 @@ def preprocess_data(
     df["timestamp"] = pd.to_datetime(df["timestamp"]).dt.tz_localize(None)
     df = generate_features(df)
 
-    if granularity == 1:
-        ts_dataset = TSDataset(df, freq="D")
-
-    elif granularity == 7:
-        ts_dataset = TSDataset(df, freq="W")
-
-    elif granularity == 30:
-        ts_dataset = TSDataset(df, freq="M")
-
-    else:
-        raise ValueError(f"Invalid value for granularity ({granularity})")
+    ts_dataset = aggregate(df, granularity)
 
     return ts_dataset
+
+
+def aggregate(df: pd.DataFrame, granularity: int) -> TSDataset:
+    return TSDataset(df, freq="D")
 
 
 def generate_features(df: pd.DataFrame) -> pd.DataFrame:

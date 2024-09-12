@@ -1,3 +1,4 @@
+from typing import Dict
 import requests
 
 from fastapi import FastAPI
@@ -14,7 +15,7 @@ TIMEOUT = 300
 
 
 @app.post("/forecast/")
-async def get_forecast(payload: dict):
+async def get_forecast(payload: Dict[str, str]) -> Dict[str, str]:
     """
     Основная точка входа для управления задачами.
     Перенаправляет запрос на Prediction-сервис.
@@ -32,7 +33,7 @@ async def get_forecast(payload: dict):
 
 
 @app.post("/clusterize/")
-async def get_clusters_dataset(payload: dict):
+async def get_clusters_dataset(payload: Dict[str, str]) -> Dict[str, str]:
     """
     Эндпоинт для кластеризации данных.
     Перенаправляет запрос на Clustering-сервис.

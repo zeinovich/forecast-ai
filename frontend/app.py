@@ -215,8 +215,6 @@ def main():
             upload_expander.warning("Please upload CSV file")
             st.stop()
 
-    # [TODO] - zeinovich - make adaptive form for target cols selection
-    # [TODO] - zeinovich - place value if no store selection
     target_name, date_name, segment_name, segments = get_dataset_features(
         sales_df, is_standard_format
     )
@@ -238,7 +236,6 @@ def main():
         st.warning(
             f'History for column "{segment_name}" doesn\'t have value "{segments}"'
         )
-        # [TODO] - zeinovich - how render plots with no history
         sales_st = st.empty()
 
     if len(filtered_sales) > 0:
@@ -250,15 +247,11 @@ def main():
     if forecast:
         # Create payload with forecast settings
         payload = {
-            # "target_name": target_name,
-            # "date_name": date_name,
-            # "segment_name": segment_name,
             "target_segment_names": segments,
             "data": encode_dataframe(sales_df),
             "horizon": forecast_settings.get("horizon", None),
             "granularity": forecast_settings.get("granularity", None),
             "model": forecast_settings.get("model", None),
-            # "metric": forecast_settings.get("metric", None),
             "top_k_features": forecast_settings.get("top_k_features", None),
         }
         cluster_payload = {
@@ -289,8 +282,6 @@ def main():
         "response" in st.session_state
         and st.session_state["response"].status_code == 200
     ):
-        # if st.session_state["response"] is not None:
-        # [TODO] - zeinovich - postprocessing of response
         # append last history point to prediction
         response = st.session_state["response"].json()
         forecast_data = decode_dataframe(response["encoded_predictions"])
@@ -318,10 +309,6 @@ def main():
         st.error("Failed to get forecast. Please check your settings and try again.")
         st.stop()
 
-    # # [TODO] - zeinovich - check if historical is present
-    # # and preprocess it
-    # Plotting the sales data
-    # [TODO] - zeinovich - how to print out
     plots_section = st.expander("Plots", expanded=True)
     plots_section.subheader(f"Forecast for {', '.join(segments)}")
     cutoff = plots_section.selectbox(
