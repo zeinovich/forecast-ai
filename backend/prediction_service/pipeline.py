@@ -59,36 +59,66 @@ def import_model_class(model_name: str):
 
     return model_class
 
+def calculate_average_forecast(df: TSDataset, horizon: int, average_segments: list[str] = None):
+    """
+    Рассчитывает средний прогноз по выбранным или всем сегментам.
+
+    :param df: TSDataset с данными
+    :param horizon: горизонт прогнозирования
+    :param average_segments: список сегментов для усреднения (если None, используются все сегменты)
+    :return: DataFrame с средним прогнозом
+    """
+    all_data = df.to_pandas(flatten=True)
+    
+    if average_segments:
+        mean_data = all_data[all_data['segment'].isin(average_segments)]
+    else:
+        mean_data = all_data
+    
+    mean_target = mean_data['target'].mean()
+    
+    last_date = all_data['timestamp'].max()
+    future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=horizon)
+    
+    avg_forecast = pd.DataFrame({
+        'timestamp': future_dates,
+        'segment': ['sku_without_history'] * horizon,
+        'target': [mean_target] * horizon,
+        'target_0.025': [mean_target * 0.9] * horizon,  # Примерный доверительный интервал
+        'target_0.975': [mean_target * 1.1] * horizon
+    })
+    
+    return avg_forecast
+    
 
 def predict_with_model(
     df: TSDataset,
+    target_segment_names: list[str],
     horizon: int,
     model_name: str,
+    metric: bool,
     top_k_features: int,
+    average_segments: list[str] = None
 ):
     """
     Интерфейс предсказания через выбранную модель.
-    Модели подключаются отдельно.
 
-    :param TSDataset df: данные для предсказания
-    :param target_segment_names: сегменты для которых неодходимо предсказать
+    :param df: данные для предсказания
+    :param target_segment_names: сегменты для которых необходимо предсказать
     :param horizon: горизонт предсказания
-    :param model: модель, которая будет использована
+    :param model_name: название модели, которая будет использована
     :param metric: необходимо ли возвращать значения метрик
-    :return: предсказанные значения
+    :param top_k_features: количество лучших признаков для отбора
+    :param average_segments: список сегментов для усреднения прогноза товаров без истории
+    :return: предсказанные значения и метрики
     """
-
     tfs_transform = TreeFeatureSelectionTransform(
         model="random_forest",
         top_k=top_k_features,
     )
     date_flags_transform = DateFlagsTransform(
-        is_weekend=True,
-        day_number_in_month=True,
-        day_number_in_week=True,
-        week_number_in_month=True,
+        is_weekend=True, day_number_in_month=True, day_number_in_week=True
     )
-
     lag_transform = LagTransform(
         in_column="target", lags=list(range(horizon, 2 * horizon + 1, 1))
     )
@@ -105,17 +135,16 @@ def predict_with_model(
         tfs_transform,
     ]
 
-    if model_name == "" or not model_name:
+    if not model_name:
         raise ValueError("Should provide model_name")
-    else:
-        model_class = import_model_class(model_name)
-        model = model_class()
-        pipeline = Pipeline(model=model, transforms=transforms, horizon=horizon)
+    
+    model_class = import_model_class(model_name)
+    model = model_class()
+    pipeline = Pipeline(model=model, transforms=transforms, horizon=horizon)
 
     pipeline.fit(df)
 
     forecast_ts = pipeline.forecast(prediction_interval=True)
-
     forecast_df = forecast_ts.df.loc[
         :, pd.IndexSlice[:, ["target", "target_0.025", "target_0.975"]]
     ]
@@ -129,11 +158,22 @@ def predict_with_model(
         ["timestamp", "segment", "target", "target_0.025", "target_0.975"]
     ]
 
-    metrics_df, _, _ = pipeline.backtest(
-        ts=df,
-        metrics=[MAE(), MSE(), SMAPE()],
-        n_folds=3,
-        aggregate_metrics=True,
-    )
+    # Добавляем прогноз для товаров без истории
+    avg_forecast = calculate_average_forecast(df, horizon, average_segments)
+    forecast_df = pd.concat([forecast_df, avg_forecast], ignore_index=True)
+
+    if metric:
+        metrics_df, _, _ = pipeline.backtest(
+            ts=df,
+            metrics=[MAE(), MSE(), SMAPE()],
+            n_folds=3,
+            aggregate_metrics=True,
+        )
+        metrics_df.loc['sku_without_history'] = np.nan
+    else:
+        metrics_df = pd.DataFrame(
+            data=["no metric passed"], columns=["metrics"], index=["segment"]
+        )
+        metrics_df.loc['sku_without_history'] = "no metric passed"
 
     return forecast_df, metrics_df
