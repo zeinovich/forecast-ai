@@ -155,7 +155,7 @@ def forecast_plot(
         )
 
     fig.update_layout(
-        title="Predicted Demand with Uncertainty Bounds",
+        title="Predicted Demand",
         xaxis_title="Date",
         yaxis_title="Demand",
     )

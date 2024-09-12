@@ -3,7 +3,6 @@ from etna.datasets import TSDataset
 from etna.metrics import SMAPE, MAE, MSE
 from etna.pipeline import Pipeline
 from etna.transforms import (
-    DensityOutliersTransform,
     DateFlagsTransform,
     LagTransform,
     RobustScalerTransform,
@@ -12,59 +11,18 @@ from etna.transforms import (
     TreeFeatureSelectionTransform,
 )
 import pandas as pd
-from sklearn.preprocessing import LabelEncoder
 
 
 def preprocess_data(
     df: pd.DataFrame,
-    target_name: str,
-    date_name: str,
-    segment_name: str,
     granularity: str,
 ) -> TSDataset:
     """
     Предобработка данных.
     Агрегируем данные по неделям или месяцам и заполняем пропуски.
     """
-    df.drop(columns=["weekday", "wday", "month", "year"], inplace=True)
-    df[date_name] = pd.to_datetime(df[date_name])
-    label_encoder = LabelEncoder()
-
-    # df["event_name_1_encoded"] = label_encoder.fit_transform(
-    #     df["event_name_1"].fillna("0")
-    # )
-    # df["event_type_1_encoded"] = label_encoder.fit_transform(
-    #     df["event_type_1"].fillna("0")
-    # )
-    # df["event_name_2_encoded"] = label_encoder.fit_transform(
-    #     df["event_name_2"].fillna("0")
-    # )
-    # df["event_type_2_encoded"] = label_encoder.fit_transform(
-    #     df["event_type_2"].fillna("0")
-    # )
-    df.drop(
-        columns=[
-            "event_name_1",
-            "event_type_1",
-            "event_name_2",
-            "event_type_2",
-            "store_id",
-            "CASHBACK_STORE_1",
-            "CASHBACK_STORE_2",
-            "CASHBACK_STORE_3",
-            "date_id",
-            "wm_yr_wk",
-            "sell_price",
-        ],
-        inplace=True,
-    )
-
-    df["timestamp"] = df[date_name]
-    df["segment"] = df[segment_name]
-    df["target"] = df[target_name]
-
-    df.drop(columns=[date_name, segment_name, target_name], inplace=True)
-
+    # df.drop(columns=["weekday", "wday", "month", "year"], inplace=True)
+    df["timestamp"] = pd.to_datetime(df["timestamp"]).dt.tz_localize(None)
     df = generate_features(df)
 
     if granularity == 1:
@@ -79,78 +37,14 @@ def preprocess_data(
     else:
         raise ValueError(f"Invalid value for granularity ({granularity})")
 
-    # ts_dataset = generate_features_etna(ts_dataset)
-    # ts_dataset = remove_outliners(ts_dataset)
-
-    # ts_dataset.df = ts_dataset.df.applymap(
-    #    lambda x: 1 if x is True else (0 if x is False else x)
-    # )
-    # ts_dataset.df = ts_dataset.df.fillna(0)
-
     return ts_dataset
-
-
-def remove_outliners(df: TSDataset):
-    outliers_transform = DensityOutliersTransform(in_column="target")
-    df.fit_transform([outliers_transform])
-    return df
-
-
-# def generate_features_etna(df: TSDataset) -> TSDataset:
-#     """
-#     Генерация стандартных признаков для временных рядов с использованием Etna.
-
-#     Признаки включают:
-#     - Признаки на основе даты (год, месяц, день недели и т.д.)
-#     - Лаги целевой переменной
-#     - Скользящее среднее
-#     - Гармоники Фурье для моделирования сезонности
-
-#     Параметры:
-#     ts_dataset: TSDataset - исходные данные временных рядов.
-
-#     Возвращает:
-#     TSDataset - временной ряд с добавленными признаками.
-#     """
-
-#     df.fit_transform([])
-#     return df
 
 
 def generate_features(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Функция для генерации признаков.
+    Функция для генерации признаков. [TODO]
     """
-
-    transformed_df = df.copy()
-
-    # transformed_df["is_event_day"] = (
-    #     transformed_df[["event_type_1_encoded", "event_type_2_encoded"]]
-    #     .notna()
-    #     .any(axis=1)
-    # )
-    # transformed_df["is_double_event"] = (
-    #     transformed_df[["event_type_1_encoded", "event_type_2_encoded"]]
-    #     .notna()
-    #     .all(axis=1)
-    # )
-    # transformed_df["is_start_of_month"] = transformed_df["timestamp"].dt.day <= 5
-    # transformed_df["is_end_of_month"] = transformed_df["timestamp"].dt.day >= (
-    #     transformed_df["timestamp"].dt.days_in_month - 4
-    # )
-    # transformed_df['average_sales_per_weekday']
-    # transformed_df['average_sales_per_month']
-    # transformed_df['has_cashback']
-    # transformed_df['store_avg_sales']
-    # transformed_df['store_item_popularity']
-    # transformed_df['store_weekday_impact']
-    # transformed_df['store_cashback_activity']
-    # transformed_df['store_price_level']
-    # transformed_df['store_seasonal_sales_variation']
-    # transformed_df['is_discounted']
-    # что-то про скидки добавить TODO
-    # ...
-    return transformed_df
+    return df
 
 
 def import_model_class(model_name: str):
@@ -172,10 +66,8 @@ def import_model_class(model_name: str):
 
 def predict_with_model(
     df: TSDataset,
-    target_segment_names: list[str],
     horizon: int,
     model_name: str,
-    metric: bool,
     top_k_features: int,
 ):
     """
@@ -195,7 +87,10 @@ def predict_with_model(
         top_k=top_k_features,
     )
     date_flags_transform = DateFlagsTransform(
-        is_weekend=True, day_number_in_month=True, day_number_in_week=True
+        is_weekend=True,
+        day_number_in_month=True,
+        day_number_in_week=True,
+        week_number_in_month=True,
     )
 
     lag_transform = LagTransform(
@@ -224,12 +119,11 @@ def predict_with_model(
     pipeline.fit(df)
 
     forecast_ts = pipeline.forecast(prediction_interval=True)
-    # forecast_ts.inverse_transform(transforms)
+
     forecast_df = forecast_ts.df.loc[
         :, pd.IndexSlice[:, ["target", "target_0.025", "target_0.975"]]
     ]
 
-    # forecast_df = forecast_df.reset_index()
     forecast_df = pd.melt(forecast_df, ignore_index=False).reset_index()
     forecast_df = forecast_df.pivot(
         index=["segment", "timestamp"], columns="feature", values="value"
@@ -239,16 +133,11 @@ def predict_with_model(
         ["timestamp", "segment", "target", "target_0.025", "target_0.975"]
     ]
 
-    if metric:
-        metrics_df, _, _ = pipeline.backtest(
-            ts=df,
-            metrics=[MAE(), MSE(), SMAPE()],
-            n_folds=3,
-            aggregate_metrics=True,
-        )
-    else:
-        metrics_df = pd.DataFrame(
-            data=["no metric passed"], columns=["metrics"], index=["segment"]
-        )
+    metrics_df, _, _ = pipeline.backtest(
+        ts=df,
+        metrics=[MAE(), MSE(), SMAPE()],
+        n_folds=3,
+        aggregate_metrics=True,
+    )
 
     return forecast_df, metrics_df

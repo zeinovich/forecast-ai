@@ -22,28 +22,26 @@ async def predict(payload: dict):
     Интерфейс предсказания.
     Получает данные, предобрабатывает их и вызывает модель для предсказания и доверительных интервалов.
     """
-    target_name = payload["target_name"]
-    date_name = payload["date_name"]
-    segment_name = payload["segment_name"]
+    # target_name = payload["target_name"]
+    # date_name = payload["date_name"]
+    # segment_name = payload["segment_name"]
     data = payload["data"]
     target_segment_names = payload["target_segment_names"]
     horizon = payload["horizon"]
     granularity = payload["granularity"]
     model_name = payload["model"]
-    metric = payload["metric"]
     top_k_features = payload["top_k_features"]
 
     df = pickle.loads(base64.b64decode(data.encode()))
 
-    df = df[df[segment_name].isin(target_segment_names)]
+    df = df[df["segment"].isin(target_segment_names)]
 
-    df = preprocess_data(df, target_name, date_name, segment_name, granularity)
+    df = preprocess_data(df, granularity)
     prediction_df, metrics_df = predict_with_model(
         df,
-        target_segment_names,
+        # target_segment_names,
         horizon // granularity,
         model_name,
-        metric,
         top_k_features=top_k_features,
     )
     encoded_predictions = encode_dataframe(prediction_df)

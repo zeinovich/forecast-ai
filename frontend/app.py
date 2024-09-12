@@ -156,17 +156,17 @@ def get_forecast_settings(forecast_expander: DeltaGenerator):
         top_k_features if not forecast_expander.checkbox("Use all features") else 10**6
     )
 
-    metric = forecast_expander.selectbox(
-        "Select Metric",
-        _metrics,
-        on_change=reset_forecast,
-    )
+    # metric = forecast_expander.selectbox(
+    #     "Select Metric",
+    #     _metrics,
+    #     on_change=reset_forecast,
+    # )
 
     return {
         "horizon": h_int,
         "granularity": g_int,
         "model": model,
-        "metric": metric,
+        # "metric": metric,
         "top_k_features": top_k_features,
     }
 
@@ -220,6 +220,9 @@ def main():
     target_name, date_name, segment_name, segments = get_dataset_features(
         sales_df, is_standard_format
     )
+    sales_df = sales_df.rename(
+        {target_name: "target", segment_name: "segment", date_name: "timestamp"}, axis=1
+    )
     forecast_expander = st.sidebar.expander("Forecast Settings", expanded=True)
     forecast_settings = get_forecast_settings(forecast_expander)
     num_steps_for_clusterization = forecast_expander.select_slider(
@@ -229,7 +232,7 @@ def main():
     # Filter the data based on selected SKU and Store
     filtered_sales = sales_df.copy()
 
-    filtered_sales = filtered_sales[filtered_sales[segment_name].isin(segments)]
+    filtered_sales = filtered_sales[filtered_sales["segment"].isin(segments)]
 
     if len(filtered_sales) == 0:
         st.warning(
@@ -239,7 +242,7 @@ def main():
         sales_st = st.empty()
 
     if len(filtered_sales) > 0:
-        filtered_sales = filtered_sales.sort_values(by=date_name)
+        filtered_sales = filtered_sales.sort_values(by="timestamp")
 
     forecast = forecast_expander.button("Get Forecast")
 
@@ -247,21 +250,21 @@ def main():
     if forecast:
         # Create payload with forecast settings
         payload = {
-            "target_name": target_name,
-            "date_name": date_name,
-            "segment_name": segment_name,
+            # "target_name": target_name,
+            # "date_name": date_name,
+            # "segment_name": segment_name,
             "target_segment_names": segments,
             "data": encode_dataframe(sales_df),
             "horizon": forecast_settings.get("horizon", None),
             "granularity": forecast_settings.get("granularity", None),
             "model": forecast_settings.get("model", None),
-            "metric": forecast_settings.get("metric", None),
+            # "metric": forecast_settings.get("metric", None),
             "top_k_features": forecast_settings.get("top_k_features", None),
         }
         cluster_payload = {
             "data": encode_dataframe(
                 filter_by_time_window(
-                    sales_df, date_name, "1-month", num_steps_for_clusterization
+                    sales_df, "timestamp", "1-month", num_steps_for_clusterization
                 )
             )
         }
@@ -304,7 +307,7 @@ def main():
 
         table = st.expander("Forecast Table")
         # Display the forecast data
-        forecast_data_for_display = process_forecast_table(forecast_data, date_name)
+        forecast_data_for_display = process_forecast_table(forecast_data, "date")
         table.data_editor(forecast_data_for_display, use_container_width=True)
 
         mtable = st.expander("Metrics Table")
@@ -331,20 +334,15 @@ def main():
 
     # Filter data by the selected time window
     if len(filtered_sales) > 0:
-        sales_for_display = filter_by_time_window(filtered_sales, date_name, cutoff)
+        sales_for_display = filter_by_time_window(filtered_sales, "timestamp", cutoff)
         dates_for_display = filter_by_time_window(dates, date_name, cutoff)
 
-        sales_for_display = sales_for_display[[date_name, segment_name, target_name]]
-        sales_for_display["upper"] = sales_for_display[target_name]
-        sales_for_display["lower"] = sales_for_display[target_name]
+        sales_for_display["upper"] = sales_for_display["target"]
+        sales_for_display["lower"] = sales_for_display["target"]
         sales_for_display = sales_for_display.rename(
-            {
-                segment_name: "segment",
-                target_name: "predicted",
-                date_name: "date",
-            },
-            axis=1,
+            {"timestamp": "date", "target": "predicted"}, axis=1
         )
+
         sales_for_display = sales_for_display.sort_values(by="date")
 
         event_dates = dates_for_display[dates_for_display["event_type_1"].notna()][
@@ -407,9 +405,8 @@ def main():
         response = st.session_state["clusters_response"].json()
         clusters_df = decode_dataframe(response["encoded_dataframe"])
 
-        clusters_df = clusters_df.groupby("cluster").agg(
-            list
-        )  # .reset_index(name="Segments")
+        clusters_df = clusters_df.groupby("cluster").agg(list)
+        clusters_df["size"] = clusters_df["segment"].apply(len)
 
         cluster_section.data_editor(clusters_df)
 

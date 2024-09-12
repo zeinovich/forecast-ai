@@ -17,13 +17,13 @@ async def clusterize(payload: dict):
     # Декодируем данные из base64 в CSV
     data = payload["data"]
 
-    df = decode_dataframe(data)[["date", "item_id", "cnt"]]
+    df = decode_dataframe(data)
 
-    items = df["item_id"].unique()
+    items = df["segment"].unique()
     items_ts = {}
 
     for item in items:
-        items_ts[item] = df[df["item_id"] == item]["cnt"].to_list()
+        items_ts[item] = df[df["segment"] == item]["target"].to_list()
 
     items_ts = pd.DataFrame.from_dict(items_ts, orient="index")
 
@@ -39,11 +39,11 @@ async def clusterize(payload: dict):
 
     # Добавляем метки кластеров к DataFrame
     items_ts["cluster"] = labels
-    items_ts.index.name = "item_id"
+    items_ts.index.name = "segment"
     items_ts = items_ts.reset_index()
 
     # Кодируем результат обратно в base64
-    encoded_result = encode_dataframe(items_ts[["item_id", "cluster"]])
+    encoded_result = encode_dataframe(items_ts[["segment", "cluster"]])
 
     return {
         "encoded_dataframe": encoded_result,

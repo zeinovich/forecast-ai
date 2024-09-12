@@ -25,9 +25,21 @@ def default_merge(
     """
     dates["date"] = pd.to_datetime(dates["date"])
 
-    merged_sales_dates = pd.merge(sales, dates, on="date_id", how="left")
-    final_merged_data = pd.merge(
-        merged_sales_dates, prices, on=["store_id", "item_id", "wm_yr_wk"], how="left"
+    merged_sales_dates = pd.merge(
+        sales, dates[["date_id", "date"]], on="date_id", how="left"
+    )
+    # final_merged_data = pd.merge(
+    #     merged_sales_dates, prices, on=["store_id", "item_id", "wm_yr_wk"], how="left"
+    # )
+
+    final_merged_data = merged_sales_dates.copy()
+
+    final_merged_data.drop(
+        columns=[
+            "store_id",
+            "date_id",
+        ],
+        inplace=True,
     )
 
     return final_merged_data
