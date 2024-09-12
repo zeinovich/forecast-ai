@@ -26,40 +26,34 @@ async def predict(payload: dict):
     date_name = payload["date_name"]
     segment_name = payload["segment_name"]
     data = payload["data"]
+    data_future = payload["data_future"]
+    columns_types = payload["columns_types"]
     target_segment_names = payload["target_segment_names"]
     horizon = payload["horizon"]
     granularity = payload["granularity"]
     model_name = payload["model"]
     metric = payload["metric"]
-    top_k_features = payload["top_k_features"]
-
-    print(target_segment_names)
-
-    # decoded_data = base64.b64decode(data)
-    # df = pd.read_csv(BytesIO(decoded_data))
+    top_k_percent_features = payload["top_k_percent_features"]
+    is_template = payload["is_template"]
 
     df = pickle.loads(base64.b64decode(data.encode()))
+    df_future = pickle.loads(base64.b64decode(data_future.encode()))
 
-    df = preprocess_data(df, target_name, date_name, segment_name, granularity)
-    prediction_df = predict_with_model(
+    df, df_future = preprocess_data(df, data_future, columns_types, target_name, date_name, segment_name, granularity, is_template)
+    prediction_df, metrics_df = predict_with_model(
         df,
+        df_future,
         target_segment_names,
-        horizon // granularity,
+        horizon,
         model_name,
         metric,
-        top_k_features=top_k_features,
+        top_k_percent_features=top_k_percent_features,
     )
 
-    # buffer_pred = BytesIO()
-    # prediction_df.to_csv(buffer_pred, index=False)
-    # encoded_predictions = base64.b64encode(buffer_pred.getvalue()).decode("utf-8")
-
-    # buffer_metrics = BytesIO()
-    # encoded_metrics = base64.b64encode(buffer_metrics.getvalue()).decode("utf-8")
     encoded_predictions = encode_dataframe(prediction_df)
-    # encoded_metrics = encode_dataframe(metrics_df)
+    encoded_metrics = encode_dataframe(metrics_df)
 
     return {
         "encoded_predictions": encoded_predictions,
-        "encoded_metrics": 0,
+        "encoded_metrics": encoded_metrics,
     }
