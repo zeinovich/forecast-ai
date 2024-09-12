@@ -32,7 +32,8 @@ _pallette = [
     "#b51963",
 ]
 
-BACKEND_URL = "http://forecast_api:8000/forecast"
+FORECAST_URL = "http://forecast_api:8000/forecast"
+CLUSTER_URL = "http://forecast_api:8000/clusterize"
 TIMEOUT = 300  # HTTP timeout in seconds
 
 DATES = "./data/raw/shop_sales_dates.csv"
@@ -219,7 +220,6 @@ def main():
     target_name, date_name, segment_name, segments = get_dataset_features(
         sales_df, is_standard_format
     )
-
     forecast_expander = st.sidebar.expander("Forecast Settings", expanded=True)
     forecast_settings = get_forecast_settings(forecast_expander)
 
@@ -256,7 +256,7 @@ def main():
 
         # Send request to the backend (example backend port assumed to be 8000)
         # Update this with the correct backend URL
-        response = requests.post(BACKEND_URL, json=payload, timeout=TIMEOUT)
+        response = requests.post(FORECAST_URL, json=payload, timeout=TIMEOUT)
         st.session_state["response"] = response
 
     elif "response" in st.session_state:
