@@ -5,4 +5,4 @@ RUN pip install -r requirements.txt
 
 COPY ./backend/clustering_service/ .
 EXPOSE 8002
-CMD ["uvicorn", "main:app", "--host", "89.169.165.189", "--port", "8002"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8002"]
