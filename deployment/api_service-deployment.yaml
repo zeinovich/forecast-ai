@@ -16,5 +16,6 @@ spec:
       containers:
       - name: forecast-api
         image: dream-team-api_service:latest # Update with your actual image name
+        imagePullPolicy: Never
         ports:
         - containerPort: 8000
