@@ -95,33 +95,28 @@ def upload_data(expander: DeltaGenerator):
 def aggregate(df: pd.DataFrame, granularity: int) -> pd.DataFrame:
     """
     Aggregates data by given granularity (1 = day, 7 = week, 30 = month) for each segment.
-    
+
     Parameters:
     - df: DataFrame with 'timestamp', 'segment', and 'target' columns.
     - granularity: integer defining the granularity (1 - day, 7 - week, 30 - month).
-    
+
     Returns:
     - Aggregated DataFrame.
     """
-    df['timestamp'] = pd.to_datetime(df['timestamp'])
-    
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+
     if granularity == 1:
-        freq = 'D'  # day
+        freq = "D"  # day
     elif granularity == 7:
-        freq = 'W'  # week
+        freq = "W"  # week
     elif granularity == 30:
-        freq = 'M'  # month
+        freq = "M"  # month
     else:
         raise ValueError("Granularity must be 1 (day), 7 (week), or 30 (month).")
-    
-    df.set_index('timestamp', inplace=True)
-    
-    aggregated_df = (
-        df.groupby('segment')
-          .resample(freq)['target']
-          .sum()
-          .reset_index()
-    )
+
+    df.set_index("timestamp", inplace=True)
+
+    aggregated_df = df.groupby("segment").resample(freq)["target"].sum().reset_index()
 
     return aggregated_df
 
@@ -364,11 +359,11 @@ def main():
         table = st.expander("Forecast Table")
         # Display the forecast data
         forecast_data_for_display = process_forecast_table(forecast_data, "date")
-        table.data_editor(forecast_data_for_display, use_container_width=True)
+        table.data_editor(forecast_data_for_display, width=640, hide_index=True)
 
         mtable = st.expander("Metrics Table")
         # Display the forecast data
-        mtable.data_editor(metrics_data, use_container_width=True)
+        mtable.data_editor(metrics_data, width=480, hide_index=True)
 
         if no_history is not None:
             segments.append(no_history["name"])
@@ -389,14 +384,13 @@ def main():
 
     # Filter data by the selected time window
     if len(filtered_sales) > 0:
-        # Используем granularity из forecast_settings
-        granularity = forecast_settings["granularity"]
-        
-        # Агрегируем данные
-        sales_for_display = aggregate(filtered_sales, granularity)
-        
         sales_for_display = filter_by_time_window(filtered_sales, "timestamp", cutoff)
         dates_for_display = filter_by_time_window(dates, date_name, cutoff)
+
+        # Используем granularity из forecast_settings
+        # Агрегируем данные
+        granularity = forecast_settings["granularity"]
+        sales_for_display = aggregate(sales_for_display, granularity)
 
         sales_for_display["upper"] = sales_for_display["target"]
         sales_for_display["lower"] = sales_for_display["target"]
@@ -451,7 +445,9 @@ def main():
 
         trace_name = (
             segment
-            if no_history is not None and no_history["name"] == segment
+            if no_history is not None
+            and no_history["name"] == segment
+            and no_history["name"] != ""
             else None
         )
 

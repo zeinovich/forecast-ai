@@ -2,7 +2,7 @@ from typing import Dict, Any, List
 import importlib
 
 from etna.datasets import TSDataset
-from etna.metrics import SMAPE, MAE, MSE
+from etna.metrics import SMAPE, MAE
 from etna.pipeline import Pipeline
 from etna.transforms import (
     DateFlagsTransform,
@@ -117,7 +117,9 @@ def calculate_average_forecast(
 
     last_date = all_data["timestamp"].max()
     future_dates = pd.date_range(
-        start=last_date + pd.Timedelta(days=granularity), periods=horizon
+        start=last_date + pd.DateOffset(days=granularity),
+        periods=horizon,
+        freq=pd.DateOffset(days=granularity),
     )
 
     avg_forecast = pd.DataFrame(
