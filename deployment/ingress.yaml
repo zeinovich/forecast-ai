@@ -9,7 +9,7 @@ metadata:
 spec:
   rules:
   - host:  # Update with your domain
-    http: http://89.169.165.189/
+    http: www.forecast-ai.com
       paths:
       - path: /
         pathType: Prefix
