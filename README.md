@@ -1,5 +1,9 @@
 # Automated Demand Forecasting
 
+## Web Page
+
+Follow [link](http://89.169.165.189:8501/) to connect to web service. **Please, do not connect from multiple users. It's just 3 Docker containers**
+
 ## Setup
 
 To setup service, you need Docker and Docker Compose installed. To setup, run:
