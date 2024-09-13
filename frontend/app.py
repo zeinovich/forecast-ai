@@ -45,6 +45,8 @@ _models = [
     "NaiveModel",
     "CatBoostMultiSegmentModel",
     "ElasticMultiSegmentModel",
+    "MovingAverageModel",
+    "SeasonalMovingAverageModel",
 ]
 
 _metrics = [
