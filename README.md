@@ -2,13 +2,13 @@
 
 
 ### How it works
-1. Upload your dataset.
-2. ав
+1. Upload your dataset in *Upload data*.
+2. 
 3. Сhoose forecast setting.
 4. Enjoy!
 
 ### Models benchmark 
-| Model Type  | Average MAE For Train Data |
+| Model Type  | Train Average MAE |
 | ------------- | ------------- |
 | CatBoostMultiSegmentModel  | 8.794  |
 | ElasticMultiSegmentModel   | 10.041   |
