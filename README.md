@@ -8,7 +8,13 @@
 4. Enjoy!
 
 ### Models benchmark 
-| Model Type  | Average MAE for train data |
+| Model Type  | Average MAE For Train Data |
 | ------------- | ------------- |
-| Content Cell  | Content Cell  |
-| Content Cell  | Content Cell  |
+| CatBoostMultiSegmentModel  | 8.794  |
+| ElasticMultiSegmentModel   | 10.041   |
+| ProphetModel   | 7.701   |
+| NaiveModel   | 10.471   |
+| MovingAverageeModel   | 10.533   |
+| SeasonalMovingAverageeModel   | 10.521   |
+
+
