@@ -2,7 +2,7 @@
 
 
 ### How it works
-1. Upload your dataset in *Upload data*.
+1. Upload your dataset in **Upload data**.
 2. 
 3. Сhoose forecast setting.
 4. Enjoy!
