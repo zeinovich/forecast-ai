@@ -48,7 +48,7 @@ async def predict(payload: dict) -> dict:
         top_k_features=top_k_features,
     )
 
-    if no_history is not None:
+    if no_history is not None and no_history["name"] != "":
         preds = calculate_average_forecast(
             data,
             horizon // granularity,

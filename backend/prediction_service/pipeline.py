@@ -203,4 +203,8 @@ def predict_with_model(
         aggregate_metrics=True,
     )
 
+    forecast_df["target"] = forecast_df["target"].apply(lambda x: max(x, 0))
+    forecast_df["target_0.975"] = forecast_df["target_0.975"].apply(lambda x: max(x, 0))
+    forecast_df["target_0.025"] = forecast_df["target_0.025"].apply(lambda x: max(x, 0))
+
     return forecast_df, metrics_df
