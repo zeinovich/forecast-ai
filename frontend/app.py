@@ -34,8 +34,8 @@ _pallette = [
     "#b51963",
 ]
 
-FORECAST_URL = "http://forecast_api:8000/forecast"
-CLUSTER_URL = "http://forecast_api:8000/clusterize"
+FORECAST_URL = "http://forecast-api:8000/forecast"
+CLUSTER_URL = "http://forecast-api:8000/clusterize"
 TIMEOUT = 300  # HTTP timeout in seconds
 
 DATES = "./data/raw/shop_sales_dates.csv"

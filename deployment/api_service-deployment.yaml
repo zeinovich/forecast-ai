@@ -14,7 +14,7 @@ spec:
         app: api-service
     spec:
       containers:
-      - name: forecast_api
+      - name: forecast-api
         image: dream-team-api_service:latest # Update with your actual image name
         ports:
         - containerPort: 8000
