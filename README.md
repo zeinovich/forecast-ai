@@ -1,11 +1,13 @@
-# Automated Demand Forecasting
+
 
 
 ### How it works
 1. Upload your dataset in **"Upload data"**.
-2. 
-3. Сhoose forecast setting.
-4. Enjoy!
+2. You can forecast for current DFU using the **"DFU settings"**.
+3. You need to select new DFU for the forecast in **"New IDs"**.
+   - If your DFU has no history for forecast  use **"Select similar IDs"** to make prediction based on similar DFU.
+5. Сhoose forecast setting.
+6. Enjoy!
 
 ### Models benchmark 
 | **Model Type**  | **Train Average MAE** |
