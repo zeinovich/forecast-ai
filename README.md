@@ -6,7 +6,7 @@
 2. You can forecast for current DFU using the **"DFU settings"**.
 3. You need to select new DFU for the forecast in **"New IDs"**.
    - If your DFU has no history for forecast  use **"Select similar IDs"** to make prediction based on similar DFU.
-5. Сhoose forecast setting.
+5. Сhoose forecast setting **"Forecast Settings"**. 
 6. Enjoy!
 
 ### Models benchmark 
