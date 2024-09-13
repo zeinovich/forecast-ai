@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prediction-service
+  namespace: forecasting-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: prediction-service
+  template:
+    metadata:
+      labels:
+        app: prediction-service
+    spec:
+      containers:
+      - name: forecast
+        image: dream-team-prediction_service:latest # Update with your actual image name
+        ports:
+        - containerPort: 8001
