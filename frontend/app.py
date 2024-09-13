@@ -206,12 +206,14 @@ def get_forecast_settings(forecast_expander: DeltaGenerator):
         on_change=reset_forecast,
     )
 
-    top_k_features = forecast_expander.select_slider(
-        "Top K features", list(range(1, 21, 1)), on_change=reset_forecast
-    )
-    top_k_features = (
-        top_k_features if not forecast_expander.checkbox("Use all features") else 10**6
-    )
+    # top_k_features = forecast_expander.select_slider(
+    #     "Top K features", list(range(1, 21, 1)), on_change=reset_forecast
+    # )
+    # top_k_features = (
+    #     top_k_features if not forecast_expander.checkbox("Use all features") else 10**6
+    # )
+
+    top_k_features = 20
 
     # metric = forecast_expander.selectbox(
     #     "Select Metric",
@@ -239,7 +241,7 @@ def process_forecast_table(df: pd.DataFrame, date_name: str):
 def main():
     """Main"""
     st.set_page_config(layout="wide")
-    st.title("Demand Forecasting")
+    st.title("Forecast AI :robot_face: :computer:")
 
     # File upload section in the sidebar
     upload_expander = st.sidebar.expander("Upload data", expanded=True)
@@ -283,9 +285,11 @@ def main():
 
     forecast_expander = st.sidebar.expander("Forecast Settings", expanded=True)
     forecast_settings = get_forecast_settings(forecast_expander)
-    num_steps_for_clusterization = forecast_expander.select_slider(
-        "Clusterization history", list(range(1, 13, 1)), value=3
-    )
+    # num_steps_for_clusterization = forecast_expander.select_slider(
+    #     "Clusterization history", list(range(1, 13, 1)), value=3
+    # )
+
+    num_steps_for_clusterization = 6
 
     # Filter the data based on selected SKU and Store
     filtered_sales = sales_df.copy()
@@ -356,6 +360,7 @@ def main():
             axis=1,
         )
 
+        plots_section = st.expander("Plots", expanded=True)
         table = st.expander("Forecast Table")
         # Display the forecast data
         forecast_data_for_display = process_forecast_table(forecast_data, "date")
@@ -372,7 +377,7 @@ def main():
         st.error("Failed to get forecast. Please check your settings and try again.")
         st.stop()
 
-    plots_section = st.expander("Plots", expanded=True)
+    # plots_section = st.expander("Plots", expanded=True)
     plots_section.subheader(f"Forecast for {', '.join(segments)}")
     cutoff = plots_section.selectbox(
         "Display history",
@@ -420,6 +425,7 @@ def main():
                     fig=sales_plot,
                     scatter_args={"line": {"color": c}},
                     plot_ci=False,
+                    showlegend=True,
                 )
                 if len(seg_hist) > 0
                 else sales_plot
@@ -458,6 +464,7 @@ def main():
             fig=sales_plot,
             scatter_args={"line": {"color": c, "dash": "dash"}},
             plot_ci=len(segments) == 1,  # plot CI only if forecast for 1 segment
+            showlegend=trace_name is not None,
         )
 
     sales_st.plotly_chart(sales_plot)
@@ -471,10 +478,16 @@ def main():
         response = st.session_state["clusters_response"].json()
         clusters_df = decode_dataframe(response["encoded_dataframe"])
 
-        clusters_df = clusters_df.groupby("cluster").agg(list)
+        clusters_df = clusters_df.groupby("cluster").agg(list).reset_index()
+        clusters_df["segment"] = clusters_df["segment"].apply(sorted)
         clusters_df["size"] = clusters_df["segment"].apply(len)
+        clusters_df["cluster"] = clusters_df["cluster"].apply(
+            lambda x: f"Cluster {x}" if x >= 0 else "Non-clustered"
+        )
 
-        cluster_section.data_editor(clusters_df)
+        cluster_section.data_editor(
+            clusters_df, hide_index=True, use_container_width=True
+        )
 
 
 if __name__ == "__main__":

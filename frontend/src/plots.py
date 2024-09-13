@@ -99,6 +99,7 @@ def forecast_plot(
     fig: go.Figure = None,
     scatter_args: Dict[str, Any] = None,
     plot_ci: bool = False,
+    showlegend: bool = True,
 ) -> go.Figure:
     """
     Plotting function for forecast.
@@ -123,7 +124,7 @@ def forecast_plot(
             y=data["predicted"],
             mode="lines",
             name=trace_name,
-            showlegend=trace_name is not None,
+            showlegend=showlegend,
             **scatter_args,
         )
     )
