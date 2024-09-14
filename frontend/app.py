@@ -38,7 +38,7 @@ FORECAST_URL = "http://forecast_api:8000/forecast"
 CLUSTER_URL = "http://forecast_api:8000/clusterize"
 TIMEOUT = 300  # HTTP timeout in seconds
 
-DATES = "./data/raw/shop_sales_dates.csv"
+DATES = "./data/shop_sales_dates.csv"
 
 _models = [
     "prophet.ProphetModel",
@@ -294,6 +294,7 @@ def main():
         if sales_file:
             sales_df = pd.read_csv(sales_file)
             dates = pd.read_csv(DATES)
+            dates["date"] = pd.to_datetime(dates["date"])
         else:
             upload_expander.warning("Please upload CSV file")
             st.stop()
@@ -304,6 +305,8 @@ def main():
     sales_df = sales_df.rename(
         {target_name: "target", segment_name: "segment", date_name: "timestamp"}, axis=1
     )
+
+    sales_df["timestamp"] = pd.to_datetime(sales_df["timestamp"])
 
     no_history = add_new_segments(sales_df)
 
@@ -411,12 +414,9 @@ def main():
 
     # Filter data by the selected time window
     if len(filtered_sales) > 0:
-        sales_for_display = filter_by_time_window(filtered_sales, "timestamp", cutoff)
-        dates_for_display = filter_by_time_window(dates, date_name, cutoff)
-
-        # Используем granularity из forecast_settings
-        # Агрегируем данные
         granularity = forecast_settings["granularity"]
+        sales_for_display = filter_by_time_window(filtered_sales, "timestamp", cutoff)
+        dates_for_display = filter_by_time_window(dates, "date", cutoff)
         sales_for_display = aggregate(sales_for_display, granularity)
 
         sales_for_display["upper"] = sales_for_display["target"]
@@ -464,7 +464,7 @@ def main():
             sales_for_display["predicted"].max(),
         )
 
-        min_x, max_x = (sales_for_display[date_name].min(), forecast_data["date"].max())
+        min_x, max_x = (sales_for_display["date"].min(), forecast_data["date"].max())
 
         sales_plot = add_minmax(sales_plot, min_y, max_y, min_x, max_x)
 
