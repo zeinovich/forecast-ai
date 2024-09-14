@@ -1,9 +1,7 @@
-![image](https://github.com/user-attachments/assets/6dca845a-487a-47f9-b731-ee01f3b71229)
-
-
+# Forecast AI 🤖💻
 
 ## Description 
-Forecas AI is a platform for automatic demand forecasting for different business areas: marketing, retail, e-commerce, etc.
+Forecast AI is a platform for automatic demand forecasting for different business areas: marketing, retail, e-commerce, etc.
 
 Using Forecas AI allows you to make a forecast using AI/ML time series forecasting methods, cluster objects, visualize data and find insights iy your data.
 
