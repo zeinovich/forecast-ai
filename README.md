@@ -22,6 +22,16 @@ To setup service, you need Docker and Docker Compose installed. To setup, run:
     docker compose build
     docker compose up -d
 
+### Models benchmark 
+| **Model Type**  | **Train Average MAE** |
+| ------------- | ------------- |
+| CatBoostMultiSegmentModel  | 8.794  |
+| ElasticMultiSegmentModel   | 10.041   |
+| ProphetModel   | 7.701   |
+| NaiveModel   | 10.471   |
+| MovingAverageeModel   | 10.533   |
+| SeasonalMovingAverageeModel   | 10.521   |
+
 ## Use
 
 ### 1. Select data format. 
@@ -43,9 +53,6 @@ Select following forecast settings:
     1. Horizon: Choose forecast horizon: 1-day, 1-week, 1-month
     2. Granularity: Choose forecast granularity, i.e. 1-week means that data will be aggregated (sum) on weekly basis
     3. Model: Choose model for forecast. In future, option "Auto" will be added to select AutoML pipeline. By default - ProphetModel
-    4. Top K features: Choose number of features to select during feature-selection step. Set "Use all features" if no feature-selection is needed. By default - 10
-    5. Metric: [deprecated]
-    6. Clustering history: Choose number on months for clusterization of data. By default - 3
 
     You're set up for forecasting. It usually takes about a minute.
 
