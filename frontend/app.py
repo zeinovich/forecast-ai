@@ -56,6 +56,26 @@ _metrics = [
     "MAPE",
 ]
 
+INFO = '''
+### How it works
+1. Upload your dataset in **"Upload data"**.
+2. You can forecast for current DFU using the **"DFU settings"**.
+3. You need to select new DFU for the forecast in **"New IDs"**.
+   - If your DFU has no history for forecast  use **"Select similar IDs"** to make prediction based on similar DFU.
+5. Сhoose forecast setting **"Forecast Settings"**. 
+6. Enjoy!
+
+### Models benchmark 
+| **Model Type**  | **Train Average MAE** |
+| ------------- | ------------- |
+| CatBoostMultiSegmentModel  | 8.794  |
+| ElasticMultiSegmentModel   | 10.041   |
+| ProphetModel   | 7.701   |
+| NaiveModel   | 10.471   |
+| MovingAverageeModel   | 10.533   |
+| SeasonalMovingAverageeModel   | 10.521   |
+'''
+
 
 # [TODO] - zeinovich - make adaptive form for file download
 def upload_standard_data():
@@ -244,6 +264,8 @@ def main():
     """Main"""
     st.set_page_config(layout="wide")
     st.title("Forecast AI :robot_face: :computer:")
+    info_holder = st.empty()
+    info_holder.markdown(INFO)
 
     # File upload section in the sidebar
     upload_expander = st.sidebar.expander("Upload data", expanded=True)
@@ -299,9 +321,6 @@ def main():
     filtered_sales = filtered_sales[filtered_sales["segment"].isin(segments)]
 
     if len(filtered_sales) == 0:
-        st.warning(
-            f'History for column "{segment_name}" doesn\'t have value "{segments}"'
-        )
         sales_st = st.empty()
 
     if len(filtered_sales) > 0:
@@ -348,6 +367,7 @@ def main():
         "response" in st.session_state
         and st.session_state["response"].status_code == 200
     ):
+        info_holder.empty()
         # append last history point to prediction
         response = st.session_state["response"].json()
         forecast_data = decode_dataframe(response["encoded_predictions"])
